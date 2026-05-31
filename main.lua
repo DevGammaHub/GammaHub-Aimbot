@@ -461,7 +461,6 @@ VisTab:AddToggle("ViewLine", Config.Visuals, "ViewLine")
 VisTab:AddToggle("Snaplines", Config.Visuals, "Snaplines")
 VisTab:AddSlider("Distance", Config.Visuals, "RenderDistance", 100, 5000, false)
 
--- Neue Others Tab (Design bleibt identisch)
 local OthersTab = Window:CreateTab("Others")
 OthersTab:AddToggle("Fly", Config.Others, "Fly")
 OthersTab:AddSlider("Fly Speed", Config.Others, "FlySpeed", 10, 200, false)
@@ -628,7 +627,10 @@ local R6_Links = {
     {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
 }
 
--- Others Features Logic
+-- =============================================
+-- OTHERS FEATURES (FIXED - kein Block mehr)
+-- =============================================
+
 local function ToggleFly(state)
     if state then
         local character = LocalPlayer.Character
@@ -666,6 +668,7 @@ local function ToggleFly(state)
     end
 end
 
+-- FIX: CanCollide nur setzen wenn Noclip aktiv, Invisibility fasst CanCollide NICHT an
 local function ToggleNoclip(state)
     local character = LocalPlayer.Character
     if not character then return end
@@ -676,15 +679,16 @@ local function ToggleNoclip(state)
     end
 end
 
+-- FIX: Invisibility veraendert CanCollide NICHT mehr -> kein unsichtbarer Block
 local function ToggleInvisibility(state)
     local character = LocalPlayer.Character
     if not character then return end
     
     for _, obj in pairs(character:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part") then
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
             if obj.Name ~= "HumanoidRootPart" then
                 obj.Transparency = state and 1 or 0
-                obj.CanCollide = not state
+                -- CanCollide wird hier absichtlich NICHT angefasst
             end
         elseif obj:IsA("Decal") or obj:IsA("Texture") then
             obj.Transparency = state and 1 or 0
@@ -693,12 +697,9 @@ local function ToggleInvisibility(state)
             if handle then
                 handle.Transparency = state and 1 or 0
             end
-        elseif obj:IsA("SpecialMesh") or obj:IsA("Mesh") then
-            obj.Parent.Transparency = state and 1 or 0
         end
     end
     
-    -- Extra: Face & Head unsichtbar machen
     local head = character:FindFirstChild("Head")
     if head then
         head.Transparency = state and 1 or 0
@@ -710,7 +711,7 @@ local function ToggleInvisibility(state)
     end
 end
 
--- Others Connections
+-- FIX: Noclip & Invisibility werden nicht mehr jeden Frame auf false gesetzt
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     if not ScriptRunning then return end
     
@@ -721,19 +722,32 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         ToggleFly(false)
     end
     
-    -- Noclip
+    -- Noclip: nur aktiv durchsetzen; Roblox setzt CanCollide selbst zurueck beim Deaktivieren
     if Config.Others.Noclip then
         ToggleNoclip(true)
-    else
-        ToggleNoclip(false)
     end
     
-    -- Invisibility
+    -- Invisibility: nur aktiv durchsetzen
     if Config.Others.Invisibility then
         ToggleInvisibility(true)
-    else
+    end
+end))
+
+-- Wenn Noclip oder Invisibility deaktiviert wird, sofort zuruecksetzen
+local PrevNoclip = false
+local PrevInvis = false
+table.insert(Connections, RunService.Heartbeat:Connect(function()
+    if not ScriptRunning then return end
+    
+    if PrevNoclip and not Config.Others.Noclip then
+        ToggleNoclip(false)
+    end
+    PrevNoclip = Config.Others.Noclip
+    
+    if PrevInvis and not Config.Others.Invisibility then
         ToggleInvisibility(false)
     end
+    PrevInvis = Config.Others.Invisibility
 end))
 
 task.spawn(function()
