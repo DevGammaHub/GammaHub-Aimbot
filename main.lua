@@ -190,7 +190,7 @@ function Library:CreateUI()
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 6)
 
     local Title = Instance.new("TextLabel")
-    Title.Text = "Universal FPS Gui | By Thetrekir"
+    Title.Text = "Universal FPS Gui | By GammaHub"
     Title.Size = UDim2.new(1, -20, 1, 0)
     Title.Position = UDim2.new(0, 10, 0, 0)
     Title.BackgroundTransparency = 1
