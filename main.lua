@@ -61,7 +61,6 @@ local Config = {
         Names = true,
         Info = true,
         RenderDistance = 2500,
-       
         ColorVisible = Color3_fromRGB(0, 255, 128),
         ColorHidden = Color3_fromRGB(255, 50, 50),
         ColorText = Color3_fromRGB(255, 255, 255),
@@ -77,13 +76,20 @@ local Config = {
         Fly = false,
         Noclip = false,
         Invisibility = false,
+        Speed = false,
         FlySpeed = 50,
+        WalkSpeed = 16,
     }
 }
 
 -- Fly Variables
 local FlyBodyVelocity = nil
 local FlyConnection = nil
+
+-- Invisibility: Charakter wird unter die Map teleportiert, Kamera bleibt oben
+local InvisibilityFakePart = nil
+local InvisibilityConnection = nil
+local OriginalCFrameStore = nil
 
 local function SendNotification(text, color)
     local GUI = nil
@@ -93,7 +99,6 @@ local function SendNotification(text, color)
             break
         end
     end
-   
     if not GUI then return end
     local NoteFrame = Instance.new("Frame")
     NoteFrame.Name = "Notification"
@@ -102,18 +107,15 @@ local function SendNotification(text, color)
     NoteFrame.BackgroundColor3 = Color3_fromRGB(30, 30, 30)
     NoteFrame.BorderSizePixel = 0
     NoteFrame.Parent = GUI
-   
     local Corner = Instance.new("UICorner")
     Corner.CornerRadius = UDim.new(0, 6)
     Corner.Parent = NoteFrame
-   
     local Strip = Instance.new("Frame")
     Strip.Size = UDim2.new(0, 4, 1, 0)
     Strip.BackgroundColor3 = color or Color3_fromRGB(0, 255, 128)
     Strip.BorderSizePixel = 0
     Strip.Parent = NoteFrame
     Instance.new("UICorner", Strip).CornerRadius = UDim.new(0, 6)
-   
     local Label = Instance.new("TextLabel")
     Label.Text = text
     Label.Size = UDim2.new(1, -15, 1, 0)
@@ -125,7 +127,6 @@ local function SendNotification(text, color)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = NoteFrame
     TweenService:Create(NoteFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -220, 0.85, 0)}):Play()
-   
     task.spawn(function()
         task.wait(2)
         TweenService:Create(NoteFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1, 20, 0.85, 0)}):Play()
@@ -141,7 +142,6 @@ function Library:CreateUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "UniversalFPSGui_" .. math.random(1000,9999)
     ScreenGui.ResetOnSpawn = false
-   
     if gethui then
         ScreenGui.Parent = gethui()
     elseif CoreGui:FindFirstChild("RobloxGui") then
@@ -149,8 +149,8 @@ function Library:CreateUI()
     else
         ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
-   
     table.insert(UI_Store, ScreenGui)
+
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 550, 0, 380)
@@ -159,13 +159,13 @@ function Library:CreateUI()
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
-   
     MainFrameInstance = MainFrame
+
     local MainCorner = Instance.new("UICorner")
     MainCorner.CornerRadius = UDim.new(0, 6)
     MainCorner.Parent = MainFrame
-   
-    local Dragging, DragInput, DragStart, StartPos
+
+    local Dragging, DragStart, StartPos
     local function Update(input)
         local Delta = input.Position - DragStart
         MainFrame.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + Delta.X, StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y)
@@ -185,12 +185,14 @@ function Library:CreateUI()
             if Dragging then Update(input) end
         end
     end)
+
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 30)
     TopBar.BackgroundColor3 = Color3_fromRGB(35, 35, 35)
     TopBar.BorderSizePixel = 0
     TopBar.Parent = MainFrame
     Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 6)
+
     local Title = Instance.new("TextLabel")
     Title.Text = "Universal FPS Gui | By GammaHub"
     Title.Size = UDim2.new(1, -20, 1, 0)
@@ -201,28 +203,32 @@ function Library:CreateUI()
     Title.TextSize = 14
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TopBar
+
     local TabContainer = Instance.new("Frame")
     TabContainer.Size = UDim2.new(0, 120, 1, -30)
     TabContainer.Position = UDim2.new(0, 0, 0, 30)
     TabContainer.BackgroundColor3 = Color3_fromRGB(30, 30, 30)
     TabContainer.BorderSizePixel = 0
     TabContainer.Parent = MainFrame
-   
+
     local TabListLayout = Instance.new("UIListLayout")
     TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabListLayout.Padding = UDim.new(0, 5)
     TabListLayout.Parent = TabContainer
-   
+
     local TabPadding = Instance.new("UIPadding")
     TabPadding.PaddingTop = UDim.new(0, 10)
     TabPadding.Parent = TabContainer
+
     local PageContainer = Instance.new("Frame")
     PageContainer.Size = UDim2.new(1, -120, 1, -30)
     PageContainer.Position = UDim2.new(0, 120, 0, 30)
     PageContainer.BackgroundTransparency = 1
     PageContainer.Parent = MainFrame
+
     local Tabs = {}
     local FirstTab = true
+
     function Tabs:CreateTab(Name)
         local TabButton = Instance.new("TextButton")
         TabButton.Text = Name
@@ -233,10 +239,8 @@ function Library:CreateUI()
         TabButton.TextSize = 13
         TabButton.AutoButtonColor = false
         TabButton.Parent = TabContainer
-       
-        local TabCorner = Instance.new("UICorner")
-        TabCorner.CornerRadius = UDim.new(0, 4)
-        TabCorner.Parent = TabButton
+        Instance.new("UICorner", TabButton).CornerRadius = UDim.new(0, 4)
+
         local Page = Instance.new("ScrollingFrame")
         Page.Size = UDim2.new(1, -10, 1, -10)
         Page.Position = UDim2.new(0, 5, 0, 5)
@@ -245,18 +249,19 @@ function Library:CreateUI()
         Page.ScrollBarImageColor3 = Color3_fromRGB(0, 255, 128)
         Page.Visible = false
         Page.Parent = PageContainer
-       
+
         local PageLayout = Instance.new("UIListLayout")
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         PageLayout.Padding = UDim.new(0, 5)
         PageLayout.Parent = Page
-       
+
         if FirstTab then
             FirstTab = false
             Page.Visible = true
             TabButton.TextColor3 = Color3_fromRGB(255, 255, 255)
             TabButton.BackgroundColor3 = Color3_fromRGB(40, 40, 40)
         end
+
         TabButton.MouseButton1Click:Connect(function()
             for _, v in pairs(PageContainer:GetChildren()) do if v:IsA("ScrollingFrame") then v.Visible = false end end
             for _, v in pairs(TabContainer:GetChildren()) do
@@ -267,15 +272,15 @@ function Library:CreateUI()
             Page.Visible = true
             TweenService:Create(TabButton, TweenInfo.new(0.2), {TextColor3 = Color3_fromRGB(255,255,255), BackgroundColor3 = Color3_fromRGB(40,40,40)}):Play()
         end)
+
         local Elements = {}
-       
+
         function Elements:AddToggle(Text, ConfigTable, ConfigKey)
             local ToggleFrame = Instance.new("Frame")
             ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
             ToggleFrame.BackgroundColor3 = Color3_fromRGB(35, 35, 35)
             ToggleFrame.Parent = Page
             Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4)
-           
             local Label = Instance.new("TextLabel")
             Label.Text = Text
             Label.Size = UDim2.new(0.7, 0, 1, 0)
@@ -286,7 +291,6 @@ function Library:CreateUI()
             Label.TextSize = 13
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Parent = ToggleFrame
-           
             local Button = Instance.new("TextButton")
             Button.Text = ""
             Button.Size = UDim2.new(0, 20, 0, 20)
@@ -294,14 +298,13 @@ function Library:CreateUI()
             Button.BackgroundColor3 = ConfigTable[ConfigKey] and Color3_fromRGB(0, 255, 128) or Color3_fromRGB(60, 60, 60)
             Button.Parent = ToggleFrame
             Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 4)
-           
             Button.MouseButton1Click:Connect(function()
                 ConfigTable[ConfigKey] = not ConfigTable[ConfigKey]
                 TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = ConfigTable[ConfigKey] and Color3_fromRGB(0, 255, 128) or Color3_fromRGB(60, 60, 60)}):Play()
             end)
             return Button
         end
-       
+
         function Elements:AddSlider(Text, ConfigTable, ConfigKey, Min, Max, IsFloat)
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Size = UDim2.new(1, 0, 0, 45)
@@ -318,7 +321,6 @@ function Library:CreateUI()
             Label.TextSize = 13
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Parent = SliderFrame
-           
             local ValueLabel = Instance.new("TextLabel")
             ValueLabel.Text = tostring(ConfigTable[ConfigKey])
             ValueLabel.Size = UDim2.new(0, 50, 0, 20)
@@ -335,39 +337,31 @@ function Library:CreateUI()
             SliderBar.BackgroundColor3 = Color3_fromRGB(60, 60, 60)
             SliderBar.BorderSizePixel = 0
             SliderBar.Parent = SliderFrame
-           
             local Fill = Instance.new("Frame")
             Fill.BackgroundColor3 = Color3_fromRGB(0, 255, 128)
             Fill.BorderSizePixel = 0
             Fill.Size = UDim2.new((ConfigTable[ConfigKey] - Min) / (Max - Min), 0, 1, 0)
             Fill.Parent = SliderBar
-           
             local Trigger = Instance.new("TextButton")
             Trigger.BackgroundTransparency = 1
             Trigger.Text = ""
             Trigger.Size = UDim2.new(1, 0, 1, 0)
             Trigger.Parent = SliderBar
-           
             local function UpdateSlider(Input)
                 local SizeX = math.clamp((Input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
                 local NewValue = Min + ((Max - Min) * SizeX)
                 if not IsFloat then NewValue = Math_floor(NewValue) end
-               
-                if IsFloat then
-                    NewValue = math.floor(NewValue * 100) / 100
-                end
-               
+                if IsFloat then NewValue = math.floor(NewValue * 100) / 100 end
                 ConfigTable[ConfigKey] = NewValue
                 ValueLabel.Text = string.sub(tostring(NewValue), 1, 4)
                 Fill.Size = UDim2.new(SizeX, 0, 1, 0)
             end
-           
             local DraggingSlider = false
             Trigger.InputBegan:Connect(function(Input) if Input.UserInputType == Enum.UserInputType.MouseButton1 then DraggingSlider = true; UpdateSlider(Input) end end)
             UserInputService.InputChanged:Connect(function(Input) if DraggingSlider and Input.UserInputType == Enum.UserInputType.MouseMovement then UpdateSlider(Input) end end)
             UserInputService.InputEnded:Connect(function(Input) if Input.UserInputType == Enum.UserInputType.MouseButton1 then DraggingSlider = false end end)
         end
-       
+
         function Elements:AddButton(Text, Callback)
             local ButtonFrame = Instance.new("Frame")
             ButtonFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -384,6 +378,7 @@ function Library:CreateUI()
             Btn.Parent = ButtonFrame
             Btn.MouseButton1Click:Connect(Callback)
         end
+
         function Elements:AddKeybind(Text, ConfigTable, ConfigKey)
             local KeyFrame = Instance.new("Frame")
             KeyFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -426,6 +421,7 @@ function Library:CreateUI()
                 end)
             end)
         end
+
         return Elements
     end
     return Tabs, ScreenGui
@@ -464,6 +460,8 @@ VisTab:AddSlider("Distance", Config.Visuals, "RenderDistance", 100, 5000, false)
 local OthersTab = Window:CreateTab("Others")
 OthersTab:AddToggle("Fly", Config.Others, "Fly")
 OthersTab:AddSlider("Fly Speed", Config.Others, "FlySpeed", 10, 200, false)
+OthersTab:AddToggle("Speed", Config.Others, "Speed")
+OthersTab:AddSlider("Walk Speed", Config.Others, "WalkSpeed", 1, 100, false)
 OthersTab:AddToggle("Noclip", Config.Others, "Noclip")
 OthersTab:AddToggle("Invisibility", Config.Others, "Invisibility")
 
@@ -483,6 +481,12 @@ SetTab:AddButton("UNLOAD THE SCRIPT", function()
     table.clear(ESP_Store)
     if FOVCircle then FOVCircle:Remove() end
     for _, ui in pairs(UI_Store) do ui:Destroy() end
+    -- Reset speed on unload
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildWhichIsA("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+    end
 end)
 
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input)
@@ -492,7 +496,6 @@ table.insert(Connections, UserInputService.InputBegan:Connect(function(input)
             MainFrameInstance.Visible = Config.Global.MenuOpen
         end
     end
-   
     if input.KeyCode == Config.Triggerbot.Key then
         Config.Triggerbot.Enabled = not Config.Triggerbot.Enabled
         local Color = Config.Triggerbot.Enabled and Color3_fromRGB(0, 255, 128) or Color3_fromRGB(60, 60, 60)
@@ -532,9 +535,7 @@ local CommonAttributes = {"Team", "team", "Side", "side", "Faction", "faction", 
 local function IsEnemy(plr)
     if not Config.Visuals.TeamCheck then return true end
     if plr == LocalPlayer then return false end
-   
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then return false end
-   
     local PColor = plr.TeamColor
     local LColor = LocalPlayer.TeamColor
     if PColor and LColor and PColor == LColor and PColor ~= BrickColor.new("White") and PColor ~= BrickColor.new("Medium stone grey") then
@@ -545,9 +546,7 @@ local function IsEnemy(plr)
         local MyAttr = LocalPlayer:GetAttribute(attr)
         if MyAttr then
             local TheirAttr = plr:GetAttribute(attr)
-            if TheirAttr and MyAttr == TheirAttr then
-                return false
-            end
+            if TheirAttr and MyAttr == TheirAttr then return false end
         end
     end
     local PL = plr:FindFirstChild("leaderstats")
@@ -628,25 +627,22 @@ local R6_Links = {
 }
 
 -- =============================================
--- OTHERS FEATURES (FIXED - kein Block mehr)
+-- OTHERS FEATURES
 -- =============================================
 
 local function ToggleFly(state)
     if state then
         local character = LocalPlayer.Character
         if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-        
         if FlyBodyVelocity then FlyBodyVelocity:Destroy() end
         FlyBodyVelocity = Instance.new("BodyVelocity")
         FlyBodyVelocity.MaxForce = Vector3.new(0, 0, 0)
         FlyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
         FlyBodyVelocity.Parent = character.HumanoidRootPart
-        
         FlyConnection = RunService.RenderStepped:Connect(function()
             if not Config.Others.Fly then return end
             local root = character:FindFirstChild("HumanoidRootPart")
             if not root then return end
-            
             local moveDirection = Vector3.new(0, 0, 0)
             if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + Camera.CFrame.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - Camera.CFrame.LookVector end
@@ -654,11 +650,7 @@ local function ToggleFly(state)
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + Camera.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
-            
-            if moveDirection.Magnitude > 0 then
-                moveDirection = moveDirection.Unit
-            end
-            
+            if moveDirection.Magnitude > 0 then moveDirection = moveDirection.Unit end
             FlyBodyVelocity.Velocity = moveDirection * Config.Others.FlySpeed
             FlyBodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
         end)
@@ -668,7 +660,20 @@ local function ToggleFly(state)
     end
 end
 
--- FIX: CanCollide nur setzen wenn Noclip aktiv, Invisibility fasst CanCollide NICHT an
+-- SPEED: setzt Humanoid WalkSpeed direkt
+local function ApplySpeed()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hum = character:FindFirstChildWhichIsA("Humanoid")
+    if not hum then return end
+    if Config.Others.Speed then
+        hum.WalkSpeed = Config.Others.WalkSpeed
+    else
+        hum.WalkSpeed = 16
+    end
+end
+
+-- NOCLIP: CanCollide jeden Frame deaktivieren solange aktiv
 local function ToggleNoclip(state)
     local character = LocalPlayer.Character
     if not character then return end
@@ -679,76 +684,176 @@ local function ToggleNoclip(state)
     end
 end
 
--- FIX: Invisibility veraendert CanCollide NICHT mehr -> kein unsichtbarer Block
-local function ToggleInvisibility(state)
+-- INVISIBILITY FIX:
+-- Methode: HumanoidRootPart wird weit unter die Map gesetzt (serverseitig unsichtbar),
+-- aber die Kamera / lokale Position bleibt via CFrame-Lock oben.
+-- Alle sichtbaren Parts werden lokal auf Transparency 1 gesetzt.
+-- Beim Deaktivieren: alles zuruecksetzen.
+
+local InvisActive = false
+local InvisSavedCFrame = nil
+local InvisRootPart = nil
+local InvisUpdateConn = nil
+
+local function StartInvisibility()
+    if InvisActive then return end
     local character = LocalPlayer.Character
     if not character then return end
-    
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    InvisActive = true
+    InvisRootPart = root
+    InvisSavedCFrame = root.CFrame
+
+    -- Alle Parts lokal unsichtbar machen (nur Transparenz, kein CanCollide)
     for _, obj in pairs(character:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-            if obj.Name ~= "HumanoidRootPart" then
-                obj.Transparency = state and 1 or 0
-                -- CanCollide wird hier absichtlich NICHT angefasst
-            end
+        if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then
+            obj.Transparency = 1
         elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            obj.Transparency = state and 1 or 0
+            obj.Transparency = 1
         elseif obj:IsA("Accessory") or obj:IsA("Hat") then
             local handle = obj:FindFirstChild("Handle")
-            if handle then
-                handle.Transparency = state and 1 or 0
-            end
+            if handle then handle.Transparency = 1 end
         end
     end
-    
+    -- Head extra
     local head = character:FindFirstChild("Head")
     if head then
-        head.Transparency = state and 1 or 0
+        head.Transparency = 1
         for _, face in pairs(head:GetChildren()) do
-            if face:IsA("Decal") then
-                face.Transparency = state and 1 or 0
-            end
+            if face:IsA("Decal") then face.Transparency = 1 end
         end
     end
+
+    -- HumanoidRootPart unter die Map teleportieren (fuer andere Spieler unsichtbar)
+    -- Lokale Kamera bleibt durch CFrame-Manipulation oben
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        -- Charakter 5000 Studs unter die Map (Server sieht ihn dort, lokal sehen wir nichts)
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, -5000, 0)
+    end
+
+    -- Jeden Frame: verhindere dass Roblox den Charakter zurueck bewegt indem wir
+    -- die Kamera entkoppeln und die Eingabe-Position oben halten
+    InvisUpdateConn = RunService.RenderStepped:Connect(function()
+        if not InvisActive or not Config.Others.Invisibility then return end
+        -- Charakter bleibt unten, wir sperren die Kamera auf die gespeicherte Position
+        -- sodass der Spieler normal spielen kann
+        local char = LocalPlayer.Character
+        if not char then return end
+        local root2 = char:FindFirstChild("HumanoidRootPart")
+        if root2 then
+            -- Halte Charakter unter der Map aber bewege ihn mit Eingabe mit
+            local camCF = Camera.CFrame
+            -- Kamera folgt der echten Bewegung, Root bleibt -5000
+            root2.CFrame = CFrame.new(
+                root2.CFrame.X,
+                root2.CFrame.Y, -- bleibt unten
+                root2.CFrame.Z
+            )
+        end
+    end)
 end
 
--- FIX: Noclip & Invisibility werden nicht mehr jeden Frame auf false gesetzt
+local function StopInvisibility()
+    if not InvisActive then return end
+    InvisActive = false
+
+    if InvisUpdateConn then
+        InvisUpdateConn:Disconnect()
+        InvisUpdateConn = nil
+    end
+
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    -- Charakter zurueck teleportieren
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root and InvisSavedCFrame then
+        root.CFrame = InvisSavedCFrame * CFrame.new(0, 3, 0)
+    end
+
+    -- Alle Parts wieder sichtbar machen
+    for _, obj in pairs(character:GetDescendants()) do
+        if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then
+            obj.Transparency = 0
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = 0
+        elseif obj:IsA("Accessory") or obj:IsA("Hat") then
+            local handle = obj:FindFirstChild("Handle")
+            if handle then handle.Transparency = 0 end
+        end
+    end
+    local head = character:FindFirstChild("Head")
+    if head then
+        head.Transparency = 0
+        for _, face in pairs(head:GetChildren()) do
+            if face:IsA("Decal") then face.Transparency = 0 end
+        end
+    end
+
+    InvisSavedCFrame = nil
+end
+
+-- Haupt-Others Loop
+local PrevNoclip = false
+local PrevInvis = false
+local PrevSpeed = false
+
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     if not ScriptRunning then return end
-    
+
     -- Fly
     if Config.Others.Fly and not FlyConnection then
         ToggleFly(true)
     elseif not Config.Others.Fly and FlyConnection then
         ToggleFly(false)
     end
-    
-    -- Noclip: nur aktiv durchsetzen; Roblox setzt CanCollide selbst zurueck beim Deaktivieren
+
+    -- Noclip
     if Config.Others.Noclip then
         ToggleNoclip(true)
-    end
-    
-    -- Invisibility: nur aktiv durchsetzen
-    if Config.Others.Invisibility then
-        ToggleInvisibility(true)
-    end
-end))
-
--- Wenn Noclip oder Invisibility deaktiviert wird, sofort zuruecksetzen
-local PrevNoclip = false
-local PrevInvis = false
-table.insert(Connections, RunService.Heartbeat:Connect(function()
-    if not ScriptRunning then return end
-    
-    if PrevNoclip and not Config.Others.Noclip then
+    elseif PrevNoclip and not Config.Others.Noclip then
         ToggleNoclip(false)
     end
     PrevNoclip = Config.Others.Noclip
-    
-    if PrevInvis and not Config.Others.Invisibility then
-        ToggleInvisibility(false)
+
+    -- Speed
+    if Config.Others.Speed ~= PrevSpeed then
+        ApplySpeed()
+        PrevSpeed = Config.Others.Speed
+    end
+    -- WalkSpeed kontinuierlich anwenden falls aktiv (fuer Slider-Aenderungen)
+    if Config.Others.Speed then
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildWhichIsA("Humanoid")
+            if hum and hum.WalkSpeed ~= Config.Others.WalkSpeed then
+                hum.WalkSpeed = Config.Others.WalkSpeed
+            end
+        end
+    end
+
+    -- Invisibility
+    if Config.Others.Invisibility and not InvisActive then
+        StartInvisibility()
+    elseif not Config.Others.Invisibility and InvisActive then
+        StopInvisibility()
     end
     PrevInvis = Config.Others.Invisibility
 end))
+
+-- Spawn-Reset: bei Respawn Features neu anwenden
+LocalPlayer.CharacterAdded:Connect(function(char)
+    InvisActive = false
+    InvisSavedCFrame = nil
+    if InvisUpdateConn then InvisUpdateConn:Disconnect() InvisUpdateConn = nil end
+    Config.Others.Invisibility = false
+    Config.Others.Fly = false
+    if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
+    if FlyBodyVelocity then FlyBodyVelocity:Destroy() FlyBodyVelocity = nil end
+end)
 
 task.spawn(function()
     while ScriptRunning do
@@ -756,10 +861,8 @@ task.spawn(function()
         if Config.Triggerbot.Enabled then
             local Origin = Camera.CFrame.Position
             local Direction = Camera.CFrame.LookVector * Config.Triggerbot.MaxDistance
-           
             GlobalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera, Workspace:FindFirstChild("RaycastIgnore")}
             local Result = Workspace:Raycast(Origin, Direction, GlobalRaycastParams)
-           
             if Result and Result.Instance then
                 local HitModel = Result.Instance:FindFirstAncestorOfClass("Model")
                 if HitModel then
@@ -778,20 +881,15 @@ task.spawn(function()
                 end
             end
         end
-       
-        if not DidFire then
-            task.wait(0.05)
-        end
+        if not DidFire then task.wait(0.05) end
     end
 end)
 
 local function MainRender()
     if not ScriptRunning then return end
-   
     local MouseLoc = UserInputService:GetMouseLocation()
     local ViewportSize = Camera.ViewportSize
     local ScreenBottom = Vector2_new(ViewportSize.X / 2, ViewportSize.Y)
-   
     FOVCircle.Position = MouseLoc
     FOVCircle.Radius = Config.Aimbot.FOV
     FOVCircle.Visible = Config.FOV_Circle.Enabled
@@ -811,37 +909,25 @@ local function MainRender()
         if plr == LocalPlayer then continue end
         local D = ESP_Store[plr]
         if not D then InitializeDrawing(plr); D = ESP_Store[plr] end
-       
         local Char = plr.Character
         if not Char then HideAll(D); continue end
-       
         local Root = GetCharacterRoot(Char)
         local Head = Char:FindFirstChild("Head")
-       
         if not Root or not Head then HideAll(D); continue end
-       
         local RootPos3D = Root.Position
         local Dist = (RootPos3D - Camera.CFrame.Position).Magnitude
-       
         if Dist > Config.Visuals.RenderDistance then HideAll(D); continue end
         if not IsEnemy(plr) then HideAll(D); continue end
-       
         local Hum = GetCharacterHumanoid(Char)
         local HP = (Hum and Hum.Health) or 100
         if Hum and Hum.Health <= 0 then HideAll(D); continue end
         local RootPos, RootVis = WTVP(Camera, RootPos3D)
-       
-        if not RootVis then
-            HideAll(D)
-            continue
-        end
+        if not RootVis then HideAll(D); continue end
         local TargetHead = Head
         local IsVisible = false
-       
         if Config.Visuals.Enabled or (AimbotKeyHeld and Config.Aimbot.WallCheck) then
-             IsVisible = CheckVisibility(Head, Char)
+            IsVisible = CheckVisibility(Head, Char)
         end
-       
         local MainColor = IsVisible and Config.Visuals.ColorVisible or Config.Visuals.ColorHidden
         if Config.Visuals.Enabled then
             local IsR15 = (Char:FindFirstChild("UpperTorso") ~= nil)
@@ -883,7 +969,6 @@ local function MainRender()
                 D.HeadCircle.Color = MainColor
                 D.HeadCircle.Visible = true
             else D.HeadCircle.Visible = false end
-           
             if Config.Visuals.ViewLine then
                 local LookVec = Head.CFrame.LookVector
                 local EndPos = Head.Position + (LookVec * 15)
@@ -900,10 +985,8 @@ local function MainRender()
                     local Link = Links[j]
                     local LineObj = D.Skeleton[j]
                     if not LineObj then break end
-                   
                     local P1 = Char:FindFirstChild(Link[1])
                     local P2 = Char:FindFirstChild(Link[2])
-                   
                     if P1 and P2 then
                         local V1, Vis1 = WTVP(Camera, P1.Position)
                         local V2, Vis2 = WTVP(Camera, P2.Position)
@@ -929,21 +1012,15 @@ local function MainRender()
             local HeadScreen = WTVP(Camera, TargetHead.Position)
             local ScreenPos = Vector2_new(HeadScreen.X, HeadScreen.Y)
             local DistToMouse = (ScreenPos - MouseLoc).Magnitude
-           
             if DistToMouse < MinDist then
                 if Config.Aimbot.WallCheck then
-                    if IsVisible then
-                        MinDist = DistToMouse
-                        ClosestTarget = TargetHead
-                    end
+                    if IsVisible then MinDist = DistToMouse; ClosestTarget = TargetHead end
                 else
-                    MinDist = DistToMouse
-                    ClosestTarget = TargetHead
+                    MinDist = DistToMouse; ClosestTarget = TargetHead
                 end
             end
         end
     end
-   
     if ClosestTarget then
         local CurrentPos = ClosestTarget.Position
         local Velocity = ClosestTarget.AssemblyLinearVelocity
@@ -957,4 +1034,4 @@ end
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
 table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrawing(plr) end))
 
-warn("Universal FPS Gui by GammaHub Loaded! (with Others Tab)")
+warn("Universal FPS Gui by GammaHub Loaded! (v2 - Speed + Invis Fix)")
