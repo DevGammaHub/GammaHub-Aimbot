@@ -22,7 +22,7 @@ This script requires an executor with **Drawing API** support. Running it on low
 You can execute the script directly using the loadstring below:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/thetrekir/Roblox-Universal-FPS-GUI/refs/heads/main/main.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DevGammaHub/GammaHub-Aimbot/refs/heads/main/main.lua"))()
 ```
 
 ## Keybinds
