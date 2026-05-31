@@ -77,8 +77,10 @@ local Config = {
         Noclip = false,
         Invisibility = false,
         Speed = false,
+        AntiRecoil = false,
         FlySpeed = 50,
         WalkSpeed = 16,
+        RecoilStrength = 5,
     }
 }
 
@@ -86,18 +88,20 @@ local Config = {
 local FlyBodyVelocity = nil
 local FlyConnection = nil
 
--- Invisibility: Charakter wird unter die Map teleportiert, Kamera bleibt oben
-local InvisibilityFakePart = nil
-local InvisibilityConnection = nil
-local OriginalCFrameStore = nil
+-- Invisibility vars
+local InvisActive = false
+local InvisSavedCFrame = nil
+local InvisRootPart = nil
+local InvisUpdateConn = nil
+
+-- Anti Recoil vars
+local AntiRecoilConnection = nil
+local IsShooting = false
 
 local function SendNotification(text, color)
     local GUI = nil
     for _, v in pairs(UI_Store) do
-        if v:IsA("ScreenGui") then
-            GUI = v
-            break
-        end
+        if v:IsA("ScreenGui") then GUI = v; break end
     end
     if not GUI then return end
     local NoteFrame = Instance.new("Frame")
@@ -463,7 +467,9 @@ OthersTab:AddSlider("Fly Speed", Config.Others, "FlySpeed", 10, 200, false)
 OthersTab:AddToggle("Speed", Config.Others, "Speed")
 OthersTab:AddSlider("Walk Speed", Config.Others, "WalkSpeed", 1, 100, false)
 OthersTab:AddToggle("Noclip", Config.Others, "Noclip")
-OthersTab:AddToggle("Invisibility", Config.Others, "Invisibility")
+OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
+OthersTab:AddSlider("Recoil Strength", Config.Others, "RecoilStrength", 1, 30, false)
+OthersTab:AddToggle("Invisibility [experimental]", Config.Others, "Invisibility")
 
 local SetTab = Window:CreateTab("Settings")
 SetTab:AddButton("UNLOAD THE SCRIPT", function()
@@ -481,12 +487,12 @@ SetTab:AddButton("UNLOAD THE SCRIPT", function()
     table.clear(ESP_Store)
     if FOVCircle then FOVCircle:Remove() end
     for _, ui in pairs(UI_Store) do ui:Destroy() end
-    -- Reset speed on unload
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildWhichIsA("Humanoid")
         if hum then hum.WalkSpeed = 16 end
     end
+    if AntiRecoilConnection then AntiRecoilConnection:Disconnect() AntiRecoilConnection = nil end
 end)
 
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input)
@@ -660,20 +666,14 @@ local function ToggleFly(state)
     end
 end
 
--- SPEED: setzt Humanoid WalkSpeed direkt
 local function ApplySpeed()
     local character = LocalPlayer.Character
     if not character then return end
     local hum = character:FindFirstChildWhichIsA("Humanoid")
     if not hum then return end
-    if Config.Others.Speed then
-        hum.WalkSpeed = Config.Others.WalkSpeed
-    else
-        hum.WalkSpeed = 16
-    end
+    hum.WalkSpeed = Config.Others.Speed and Config.Others.WalkSpeed or 16
 end
 
--- NOCLIP: CanCollide jeden Frame deaktivieren solange aktiv
 local function ToggleNoclip(state)
     local character = LocalPlayer.Character
     if not character then return end
@@ -684,29 +684,39 @@ local function ToggleNoclip(state)
     end
 end
 
--- INVISIBILITY FIX:
--- Methode: HumanoidRootPart wird weit unter die Map gesetzt (serverseitig unsichtbar),
--- aber die Kamera / lokale Position bleibt via CFrame-Lock oben.
--- Alle sichtbaren Parts werden lokal auf Transparency 1 gesetzt.
--- Beim Deaktivieren: alles zuruecksetzen.
+-- ANTI RECOIL
+-- Waehrend Mouse1 gehalten wird: Maus kontinuierlich nach unten schieben
+-- um den Recoil (Kamera geht nach oben) auszugleichen.
+local function StartAntiRecoil()
+    if AntiRecoilConnection then return end
+    AntiRecoilConnection = RunService.RenderStepped:Connect(function()
+        if not ScriptRunning then return end
+        if not Config.Others.AntiRecoil then return end
+        -- Nur aktiv wenn Maustaste 1 gedrueckt (Schießen)
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            -- mousemoverel(x, y): positives Y = Maus nach unten = kompensiert Recoil nach oben
+            mousemoverel(0, Config.Others.RecoilStrength)
+        end
+    end)
+end
 
-local InvisActive = false
-local InvisSavedCFrame = nil
-local InvisRootPart = nil
-local InvisUpdateConn = nil
+local function StopAntiRecoil()
+    if AntiRecoilConnection then
+        AntiRecoilConnection:Disconnect()
+        AntiRecoilConnection = nil
+    end
+end
 
+-- INVISIBILITY (experimental)
 local function StartInvisibility()
     if InvisActive then return end
     local character = LocalPlayer.Character
     if not character then return end
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
-
     InvisActive = true
     InvisRootPart = root
     InvisSavedCFrame = root.CFrame
-
-    -- Alle Parts lokal unsichtbar machen (nur Transparenz, kein CanCollide)
     for _, obj in pairs(character:GetDescendants()) do
         if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then
             obj.Transparency = 1
@@ -717,7 +727,6 @@ local function StartInvisibility()
             if handle then handle.Transparency = 1 end
         end
     end
-    -- Head extra
     local head = character:FindFirstChild("Head")
     if head then
         head.Transparency = 1
@@ -725,33 +734,17 @@ local function StartInvisibility()
             if face:IsA("Decal") then face.Transparency = 1 end
         end
     end
-
-    -- HumanoidRootPart unter die Map teleportieren (fuer andere Spieler unsichtbar)
-    -- Lokale Kamera bleibt durch CFrame-Manipulation oben
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if hrp then
-        -- Charakter 5000 Studs unter die Map (Server sieht ihn dort, lokal sehen wir nichts)
         hrp.CFrame = hrp.CFrame * CFrame.new(0, -5000, 0)
     end
-
-    -- Jeden Frame: verhindere dass Roblox den Charakter zurueck bewegt indem wir
-    -- die Kamera entkoppeln und die Eingabe-Position oben halten
     InvisUpdateConn = RunService.RenderStepped:Connect(function()
         if not InvisActive or not Config.Others.Invisibility then return end
-        -- Charakter bleibt unten, wir sperren die Kamera auf die gespeicherte Position
-        -- sodass der Spieler normal spielen kann
         local char = LocalPlayer.Character
         if not char then return end
         local root2 = char:FindFirstChild("HumanoidRootPart")
         if root2 then
-            -- Halte Charakter unter der Map aber bewege ihn mit Eingabe mit
-            local camCF = Camera.CFrame
-            -- Kamera folgt der echten Bewegung, Root bleibt -5000
-            root2.CFrame = CFrame.new(
-                root2.CFrame.X,
-                root2.CFrame.Y, -- bleibt unten
-                root2.CFrame.Z
-            )
+            root2.CFrame = CFrame.new(root2.CFrame.X, root2.CFrame.Y, root2.CFrame.Z)
         end
     end)
 end
@@ -759,22 +752,13 @@ end
 local function StopInvisibility()
     if not InvisActive then return end
     InvisActive = false
-
-    if InvisUpdateConn then
-        InvisUpdateConn:Disconnect()
-        InvisUpdateConn = nil
-    end
-
+    if InvisUpdateConn then InvisUpdateConn:Disconnect() InvisUpdateConn = nil end
     local character = LocalPlayer.Character
     if not character then return end
-
-    -- Charakter zurueck teleportieren
     local root = character:FindFirstChild("HumanoidRootPart")
     if root and InvisSavedCFrame then
         root.CFrame = InvisSavedCFrame * CFrame.new(0, 3, 0)
     end
-
-    -- Alle Parts wieder sichtbar machen
     for _, obj in pairs(character:GetDescendants()) do
         if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then
             obj.Transparency = 0
@@ -792,7 +776,6 @@ local function StopInvisibility()
             if face:IsA("Decal") then face.Transparency = 0 end
         end
     end
-
     InvisSavedCFrame = nil
 end
 
@@ -800,6 +783,7 @@ end
 local PrevNoclip = false
 local PrevInvis = false
 local PrevSpeed = false
+local PrevAntiRecoil = false
 
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     if not ScriptRunning then return end
@@ -824,7 +808,6 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         ApplySpeed()
         PrevSpeed = Config.Others.Speed
     end
-    -- WalkSpeed kontinuierlich anwenden falls aktiv (fuer Slider-Aenderungen)
     if Config.Others.Speed then
         local char = LocalPlayer.Character
         if char then
@@ -835,7 +818,15 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Invisibility
+    -- Anti Recoil
+    if Config.Others.AntiRecoil and not AntiRecoilConnection then
+        StartAntiRecoil()
+    elseif not Config.Others.AntiRecoil and AntiRecoilConnection then
+        StopAntiRecoil()
+    end
+    PrevAntiRecoil = Config.Others.AntiRecoil
+
+    -- Invisibility (experimental)
     if Config.Others.Invisibility and not InvisActive then
         StartInvisibility()
     elseif not Config.Others.Invisibility and InvisActive then
@@ -844,7 +835,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     PrevInvis = Config.Others.Invisibility
 end))
 
--- Spawn-Reset: bei Respawn Features neu anwenden
+-- Spawn-Reset
 LocalPlayer.CharacterAdded:Connect(function(char)
     InvisActive = false
     InvisSavedCFrame = nil
@@ -1034,4 +1025,4 @@ end
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
 table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrawing(plr) end))
 
-warn("Universal FPS Gui by GammaHub Loaded! (v2 - Speed + Invis Fix)")
+warn("Universal FPS Gui by GammaHub Loaded! (v3 - AntiRecoil + Invis experimental)")
