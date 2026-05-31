@@ -868,4 +868,4 @@ end
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
 table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrawing(plr) end))
 
-warn("Universal FPS Gui by Thetrekir Loaded!")
+warn("Universal FPS Gui by GammaHub Loaded!")
