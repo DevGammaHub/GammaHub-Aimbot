@@ -679,13 +679,34 @@ end
 local function ToggleInvisibility(state)
     local character = LocalPlayer.Character
     if not character then return end
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            part.Transparency = state and 1 or 0
+    
+    for _, obj in pairs(character:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part") then
+            if obj.Name ~= "HumanoidRootPart" then
+                obj.Transparency = state and 1 or 0
+                obj.CanCollide = not state
+            end
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = state and 1 or 0
+        elseif obj:IsA("Accessory") or obj:IsA("Hat") then
+            local handle = obj:FindFirstChild("Handle")
+            if handle then
+                handle.Transparency = state and 1 or 0
+            end
+        elseif obj:IsA("SpecialMesh") or obj:IsA("Mesh") then
+            obj.Parent.Transparency = state and 1 or 0
         end
     end
-    if character:FindFirstChild("Humanoid") then
-        character.Humanoid.RootPart.Transparency = state and 1 or 0
+    
+    -- Extra: Face & Head unsichtbar machen
+    local head = character:FindFirstChild("Head")
+    if head then
+        head.Transparency = state and 1 or 0
+        for _, face in pairs(head:GetChildren()) do
+            if face:IsA("Decal") then
+                face.Transparency = state and 1 or 0
+            end
+        end
     end
 end
 
