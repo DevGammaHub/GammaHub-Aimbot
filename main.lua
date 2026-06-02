@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
@@ -554,36 +555,32 @@ TrollTab:AddToggle("Orbit Part", Config.Troll, "OrbitEnabled")
 TrollTab:AddSlider("Orbit Speed", Config.Troll, "OrbitSpeed", 1, 50, false)
 
 local EmotesTab = Window:CreateTab("Emotes")
-EmotesTab:AddButton("Spin Dance", function()
-    pcall(function() Emote_SpinDance() end)
-end)
-EmotesTab:AddButton("Hop Party", function()
-    pcall(function() Emote_HopParty() end)
-end)
-EmotesTab:AddButton("Moonwalk", function()
-    pcall(function() Emote_Moonwalk() end)
-end)
-EmotesTab:AddButton("Confetti", function()
-    pcall(function() Emote_Confetti() end)
-end)
-EmotesTab:AddButton("Teleport Pop", function()
-    pcall(function() Emote_TelePop() end)
-end)
-EmotesTab:AddButton("Headbob", function()
-    pcall(function() Emote_Headbob() end)
-end)
-EmotesTab:AddButton("Jiggle", function()
-    pcall(function() Emote_Jiggle() end)
-end)
-EmotesTab:AddButton("Wave Pose", function()
-    pcall(function() Emote_WavePose() end)
-end)
-EmotesTab:AddButton("Disco", function()
-    pcall(function() Emote_Disco() end)
-end)
-EmotesTab:AddButton("Slide", function()
-    pcall(function() Emote_Slide() end)
-end)
+local function PlayAndBroadcast(emoteName)
+    pcall(function()
+        if emoteName == "SpinDance" then Emote_SpinDance() end
+        if emoteName == "HopParty" then Emote_HopParty() end
+        if emoteName == "Moonwalk" then Emote_Moonwalk() end
+        if emoteName == "Confetti" then Emote_Confetti() end
+        if emoteName == "TeleportPop" then Emote_TelePop() end
+        if emoteName == "Headbob" then Emote_Headbob() end
+        if emoteName == "Jiggle" then Emote_Jiggle() end
+        if emoteName == "WavePose" then Emote_WavePose() end
+        if emoteName == "Disco" then Emote_Disco() end
+        if emoteName == "Slide" then Emote_Slide() end
+    end)
+    SendEmoteToServer(emoteName)
+end
+
+EmotesTab:AddButton("Spin Dance", function() PlayAndBroadcast("SpinDance") end)
+EmotesTab:AddButton("Hop Party", function() PlayAndBroadcast("HopParty") end)
+EmotesTab:AddButton("Moonwalk", function() PlayAndBroadcast("Moonwalk") end)
+EmotesTab:AddButton("Confetti", function() PlayAndBroadcast("Confetti") end)
+EmotesTab:AddButton("Teleport Pop", function() PlayAndBroadcast("TeleportPop") end)
+EmotesTab:AddButton("Headbob", function() PlayAndBroadcast("Headbob") end)
+EmotesTab:AddButton("Jiggle", function() PlayAndBroadcast("Jiggle") end)
+EmotesTab:AddButton("Wave Pose", function() PlayAndBroadcast("WavePose") end)
+EmotesTab:AddButton("Disco", function() PlayAndBroadcast("Disco") end)
+EmotesTab:AddButton("Slide", function() PlayAndBroadcast("Slide") end)
 
 local OthersTab = Window:CreateTab("Others")
 OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
@@ -1019,23 +1016,76 @@ local function StopOrbit()
 end
 
 -- Emote implementations
-local function Emote_SpinDance()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local t = 0
-    local conn
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp or not hrp.Parent then conn:Disconnect(); return end
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(720) * dt, 0)
-        if t > 3 then conn:Disconnect() end
+local EmoteEvent = ReplicatedStorage:FindFirstChild("GammaHub_EmoteEvent")
+
+local function SendEmoteToServer(name)
+    if EmoteEvent and EmoteEvent:IsA("RemoteEvent") then
+        pcall(function() EmoteEvent:FireServer(name) end)
+    else
+        SendNotification("No server emote relay found — emote will be local only", Color3_fromRGB(255,200,50))
+    end
+end
+
+-- Listen for server broadcasts and play emotes for specified player
+if EmoteEvent and EmoteEvent:IsA("RemoteEvent") then
+    EmoteEvent.OnClientEvent:Connect(function(targetName, emoteName)
+        local target = Players:FindFirstChild(targetName)
+        if target and target.Character then
+            local char = target.Character
+            pcall(function()
+                if emoteName == "SpinDance" then Emote_SpinDance(char) end
+                if emoteName == "HopParty" then Emote_HopParty(char) end
+                if emoteName == "Moonwalk" then Emote_Moonwalk(char) end
+                if emoteName == "Confetti" then Emote_Confetti(char) end
+                if emoteName == "TeleportPop" then Emote_TelePop(char) end
+                if emoteName == "Headbob" then Emote_Headbob(char) end
+                if emoteName == "Jiggle" then Emote_Jiggle(char) end
+                if emoteName == "WavePose" then Emote_WavePose(char) end
+                if emoteName == "Disco" then Emote_Disco(char) end
+                if emoteName == "Slide" then Emote_Slide(char) end
+            end)
+        end
     end)
 end
 
-local function Emote_HopParty()
-    local char = LocalPlayer.Character
+local function Emote_SpinDance(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if char == LocalPlayer.Character then
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp or not hrp.Parent then conn:Disconnect(); return end
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(720) * dt, 0)
+            if t > 3 then conn:Disconnect() end
+        end)
+    else
+        -- show a rotating neon part around target for remote clients
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.4,0.4,0.4)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Color = Color3_fromRGB(255,100,100)
+        p.Parent = Workspace
+        local ang = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            ang = ang + math.rad(1080) * dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new(1.5 * math.cos(ang), 0.5, 1.5 * math.sin(ang))
+            if ang > math.rad(1080*3) then conn:Disconnect(); p:Destroy() end
+        end)
+    end
+end
+
+local function Emote_HopParty(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildWhichIsA("Humanoid")
     if not hum then return end
@@ -1049,24 +1099,44 @@ local function Emote_HopParty()
     end)
 end
 
-local function Emote_Moonwalk()
-    local char = LocalPlayer.Character
+local function Emote_Moonwalk(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local t = 0
-    local conn
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp.Parent then conn:Disconnect(); return end
-        local back = - (hrp.CFrame.LookVector) * (2 * dt)
-        hrp.CFrame = hrp.CFrame + back
-        if t > 2 then conn:Disconnect() end
-    end)
+    if char == LocalPlayer.Character then
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp.Parent then conn:Disconnect(); return end
+            local back = - (hrp.CFrame.LookVector) * (2 * dt)
+            hrp.CFrame = hrp.CFrame + back
+            if t > 2 then conn:Disconnect() end
+        end)
+    else
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.3,0.3,0.3)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Color = Color3_fromRGB(200,200,255)
+        p.Parent = Workspace
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new(0, 0.5 + math.sin(t*4)*0.2, 0)
+            if t > 2 then conn:Disconnect(); p:Destroy() end
+        end)
+    end
 end
 
-local function Emote_Confetti()
-    local char = LocalPlayer.Character
+local function Emote_Confetti(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local head = char:FindFirstChild("Head")
     if not head then return end
@@ -1087,77 +1157,149 @@ local function Emote_Confetti()
     end
 end
 
-local function Emote_TelePop()
-    local char = LocalPlayer.Character
+local function Emote_TelePop(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local start = hrp.CFrame
-    local t = 0
-    local conn
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp.Parent then conn:Disconnect(); return end
-        local offset = Vector3.new((math.random()-0.5)*2, 0, (math.random()-0.5)*2)
-        hrp.CFrame = start * CFrame.new(offset)
-        if t > 1 then hrp.CFrame = start; conn:Disconnect() end
-    end)
+    if char == LocalPlayer.Character then
+        local start = hrp.CFrame
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp.Parent then conn:Disconnect(); return end
+            local offset = Vector3.new((math.random()-0.5)*2, 0, (math.random()-0.5)*2)
+            hrp.CFrame = start * CFrame.new(offset)
+            if t > 1 then hrp.CFrame = start; conn:Disconnect() end
+        end)
+    else
+        -- small pop effect on target head
+        local head = char:FindFirstChild("Head")
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.5,0.5,0.5)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Color = Color3_fromRGB(255,150,150)
+        p.CFrame = head.CFrame * CFrame.new(0,1,0)
+        p.Parent = Workspace
+        game:GetService("Debris"):AddItem(p, 0.8)
+    end
 end
 
-local function Emote_Headbob()
-    local char = LocalPlayer.Character
+local function Emote_Headbob(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local t = 0
-    local conn
-    local orig = hrp.CFrame
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp.Parent then conn:Disconnect(); return end
-        local y = math.sin(t*10) * 0.2
-        hrp.CFrame = orig * CFrame.new(0, y, 0)
-        if t > 3 then hrp.CFrame = orig; conn:Disconnect() end
-    end)
+    if char == LocalPlayer.Character then
+        local t = 0
+        local conn
+        local orig = hrp.CFrame
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp.Parent then conn:Disconnect(); return end
+            local y = math.sin(t*10) * 0.2
+            hrp.CFrame = orig * CFrame.new(0, y, 0)
+            if t > 3 then hrp.CFrame = orig; conn:Disconnect() end
+        end)
+    else
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local t = 0
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.2,0.2,0.2)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Parent = Workspace
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new(0, 0.5 + math.sin(t*10) * 0.2, 0)
+            if t > 3 then conn:Disconnect(); p:Destroy() end
+        end)
+    end
 end
 
-local function Emote_Jiggle()
-    local char = LocalPlayer.Character
+local function Emote_Jiggle(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local t = 0
-    local conn
-    local orig = hrp.CFrame
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp.Parent then conn:Disconnect(); return end
-        local dx = (math.random()-0.5)*0.2
-        local dz = (math.random()-0.5)*0.2
-        hrp.CFrame = orig * CFrame.new(dx, 0, dz)
-        if t > 2 then hrp.CFrame = orig; conn:Disconnect() end
-    end)
+    if char == LocalPlayer.Character then
+        local t = 0
+        local conn
+        local orig = hrp.CFrame
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp.Parent then conn:Disconnect(); return end
+            local dx = (math.random()-0.5)*0.2
+            local dz = (math.random()-0.5)*0.2
+            hrp.CFrame = orig * CFrame.new(dx, 0, dz)
+            if t > 2 then hrp.CFrame = orig; conn:Disconnect() end
+        end)
+    else
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.2,0.2,0.2)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Parent = Workspace
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new((math.random()-0.5)*0.5, 0.5, (math.random()-0.5)*0.5)
+            if t > 2 then conn:Disconnect(); p:Destroy() end
+        end)
+    end
 end
 
-local function Emote_WavePose()
-    local char = LocalPlayer.Character
+local function Emote_WavePose(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local t = 0
-    local conn
-    local orig = hrp.CFrame
-    conn = RunService.RenderStepped:Connect(function(dt)
-        t = t + dt
-        if not hrp.Parent then conn:Disconnect(); return end
-        local ang = math.sin(t*6) * 0.4
-        hrp.CFrame = orig * CFrame.Angles(0, ang, 0)
-        if t > 2.5 then hrp.CFrame = orig; conn:Disconnect() end
-    end)
+    if char == LocalPlayer.Character then
+        local t = 0
+        local conn
+        local orig = hrp.CFrame
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not hrp.Parent then conn:Disconnect(); return end
+            local ang = math.sin(t*6) * 0.4
+            hrp.CFrame = orig * CFrame.Angles(0, ang, 0)
+            if t > 2.5 then hrp.CFrame = orig; conn:Disconnect() end
+        end)
+    else
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.2,0.2,0.2)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Parent = Workspace
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new(0, 0.8 + math.sin(t*6)*0.2, math.sin(t*6)*0.2)
+            if t > 2.5 then conn:Disconnect(); p:Destroy() end
+        end)
+    end
 end
 
-local function Emote_Disco()
-    local char = LocalPlayer.Character
+local function Emote_Disco(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local head = char:FindFirstChild("Head")
     if not head then return end
@@ -1178,16 +1320,37 @@ local function Emote_Disco()
     end)
 end
 
-local function Emote_Slide()
-    local char = LocalPlayer.Character
+local function Emote_Slide(char)
+    char = char or LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local vel = Instance.new("BodyVelocity")
-    vel.MaxForce = Vector3.new(1e5, 0, 1e5)
-    vel.Velocity = hrp.CFrame.LookVector * 20
-    vel.Parent = hrp
-    game:GetService("Debris"):AddItem(vel, 1)
+    if char == LocalPlayer.Character then
+        local vel = Instance.new("BodyVelocity")
+        vel.MaxForce = Vector3.new(1e5, 0, 1e5)
+        vel.Velocity = hrp.CFrame.LookVector * 20
+        vel.Parent = hrp
+        game:GetService("Debris"):AddItem(vel, 1)
+    else
+        -- remote: show a sliding streak
+        local head = char:FindFirstChild("Head") or hrp
+        if not head then return end
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.5,0.1,1)
+        p.Anchored = true
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Color = Color3_fromRGB(150,200,255)
+        p.Parent = Workspace
+        local t = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            t = t + dt
+            if not head.Parent then conn:Disconnect(); p:Destroy(); return end
+            p.CFrame = head.CFrame * CFrame.new(0, -1, -t*5)
+            if t > 1 then conn:Disconnect(); p:Destroy() end
+        end)
+    end
 end
 
 -- Main Loop
@@ -1449,6 +1612,6 @@ local function MainRender()
 end
 
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
-table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrawing(plr) end))
+table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrAawing(plr) end))
 
 warn("Universal FPS Gui by GammaHub Loaded! (v3 - Players Tab + Godmode)")
