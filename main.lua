@@ -108,7 +108,7 @@ function Library:CreateUI()
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and input == dragInput and dragging and Main.Visible then
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging and Main.Visible then
             update(input)
         end
     end)
@@ -471,7 +471,7 @@ local function StartSpin()
     if not hrp then return end
     TrollSpinConn = RunService.RenderStepped:Connect(function(dt)
         if not Config.Troll.Spin then return end
-        if hrp and hrp.Parent then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.Troll.SpinSpeed) * dt, 0) end
+        if hrp and hrp.Parent then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.Troll.SpinSpeed * 4) * dt, 0) end
     end)
 end
 local function StopSpin() if TrollSpinConn then TrollSpinConn:Disconnect(); TrollSpinConn = nil end end
