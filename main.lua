@@ -85,6 +85,16 @@ local Config = {
         AntiRecoil = false,
         RecoilStrength = 5,
     }
+    ,Troll = {
+        Enabled = false,
+        Spin = false,
+        SpinSpeed = 20,
+        AttachEnabled = false,
+        AttachTarget = "",
+        OrbitEnabled = false,
+        OrbitSpeed = 10,
+        AnnoyPlayers = false,
+    }
 }
 
 -- Fly Variables
@@ -447,6 +457,52 @@ function Library:CreateUI()
             end)
         end
 
+        function Elements:AddTextbox(Text, Placeholder, Callback)
+            local BoxFrame = Instance.new("Frame")
+            BoxFrame.Size = UDim2.new(1, 0, 0, 35)
+            BoxFrame.BackgroundColor3 = Color3_fromRGB(35, 35, 35)
+            BoxFrame.Parent = Page
+            Instance.new("UICorner", BoxFrame).CornerRadius = UDim.new(0,4)
+
+            local Label = Instance.new("TextLabel")
+            Label.Text = Text
+            Label.Size = UDim2.new(0.4, 0, 1, 0)
+            Label.Position = UDim2.new(0, 10, 0, 0)
+            Label.BackgroundTransparency = 1
+            Label.TextColor3 = Color3_fromRGB(220, 220, 220)
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 13
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = BoxFrame
+
+            local TB = Instance.new("TextBox")
+            TB.Text = Placeholder or ""
+            TB.Size = UDim2.new(0.45, -70, 0, 20)
+            TB.Position = UDim2.new(0.45, 0, 0.5, -10)
+            TB.BackgroundColor3 = Color3_fromRGB(60,60,60)
+            TB.TextColor3 = Color3_fromRGB(255,255,255)
+            TB.Font = Enum.Font.Gotham
+            TB.TextSize = 13
+            TB.ClearTextOnFocus = false
+            TB.Parent = BoxFrame
+
+            local Btn = Instance.new("TextButton")
+            Btn.Text = "Set"
+            Btn.Size = UDim2.new(0, 50, 0, 20)
+            Btn.Position = UDim2.new(1, -60, 0.5, -10)
+            Btn.BackgroundColor3 = Color3_fromRGB(60,60,60)
+            Btn.TextColor3 = Color3_fromRGB(255,255,255)
+            Btn.Font = Enum.Font.GothamBold
+            Btn.Parent = BoxFrame
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,4)
+
+            Btn.MouseButton1Click:Connect(function()
+                local txt = TB.Text or ""
+                pcall(function() Callback(txt) end)
+            end)
+            return TB, Btn
+        end
+
         return Elements
     end
     return Tabs, ScreenGui
@@ -494,6 +550,16 @@ PlayersTab:AddSlider("Walk Speed", Config.Players, "WalkSpeed", 1, 100, false)
 local OthersTab = Window:CreateTab("Others")
 OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
 OthersTab:AddSlider("Recoil Strength", Config.Others, "RecoilStrength", 1, 30, false)
+ 
+local TrollTab = Window:CreateTab("Troll")
+TrollTab:AddToggle("Enable Troll", Config.Troll, "Enabled")
+TrollTab:AddToggle("Spin", Config.Troll, "Spin")
+TrollTab:AddSlider("Spin Speed", Config.Troll, "SpinSpeed", 1, 100, false)
+local _tb, _btn = TrollTab:AddTextbox("Target Name", "PlayerName", function(txt) Config.Troll.AttachTarget = txt end)
+TrollTab:AddToggle("Attach To Head", Config.Troll, "AttachEnabled")
+TrollTab:AddToggle("Orbit Part", Config.Troll, "OrbitEnabled")
+TrollTab:AddSlider("Orbit Speed", Config.Troll, "OrbitSpeed", 1, 50, false)
+TrollTab:AddToggle("Annoy Players (Billboard)", Config.Troll, "AnnoyPlayers")
 
 local SetTab = Window:CreateTab("Settings")
 SetTab:AddButton("UNLOAD THE SCRIPT", function()
@@ -831,6 +897,131 @@ local function StopAntiRecoil()
     end
 end
 
+-- Troll feature variables
+local TrollSpinConn = nil
+local TrollAttachConn = nil
+local TrollOrbitConn = nil
+local TrollBillboards = {}
+local TrollOrbitPart = nil
+
+local function StartSpin()
+    if TrollSpinConn then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    TrollSpinConn = RunService.RenderStepped:Connect(function(dt)
+        if not Config.Troll.Spin then return end
+        if hrp and hrp.Parent then
+            local ang = math.rad(Config.Troll.SpinSpeed) * dt
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, ang, 0)
+        end
+    end)
+end
+
+local function StopSpin()
+    if TrollSpinConn then TrollSpinConn:Disconnect() TrollSpinConn = nil end
+end
+
+local function StartAttach()
+    if TrollAttachConn then return end
+    TrollAttachConn = RunService.RenderStepped:Connect(function()
+        if not Config.Troll.AttachEnabled then return end
+        local targetName = Config.Troll.AttachTarget
+        if not targetName or targetName == "" then return end
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if string.lower(p.Name) == string.lower(targetName) or (p.DisplayName and string.lower(p.DisplayName) == string.lower(targetName)) then
+                targetPlayer = p; break
+            end
+        end
+        if not targetPlayer or not targetPlayer.Character then return end
+        local targetHead = targetPlayer.Character:FindFirstChild("Head")
+        local myChar = LocalPlayer.Character
+        if targetHead and myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            local hrp = myChar.HumanoidRootPart
+            hrp.CFrame = targetHead.CFrame * CFrame.new(0, 1.5, 0)
+        end
+    end)
+end
+
+local function StopAttach()
+    if TrollAttachConn then TrollAttachConn:Disconnect() TrollAttachConn = nil end
+end
+
+local function StartOrbit()
+    if TrollOrbitConn then return end
+    local centerPart = nil
+    local targetName = Config.Troll.AttachTarget
+    local targetPlayer = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if string.lower(p.Name) == string.lower(targetName) or (p.DisplayName and string.lower(p.DisplayName) == string.lower(targetName)) then
+            targetPlayer = p; break
+        end
+    end
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+        centerPart = targetPlayer.Character.Head
+    else
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("Head") then centerPart = myChar.Head end
+    end
+    if not centerPart then return end
+    if not TrollOrbitPart then
+        TrollOrbitPart = Instance.new("Part")
+        TrollOrbitPart.Size = Vector3.new(0.4,0.4,0.4)
+        TrollOrbitPart.Anchored = true
+        TrollOrbitPart.CanCollide = false
+        TrollOrbitPart.Transparency = 0
+        TrollOrbitPart.Material = Enum.Material.Neon
+        TrollOrbitPart.Color = Color3_fromRGB(0,255,128)
+        TrollOrbitPart.Parent = Workspace
+    end
+    local angle = 0
+    TrollOrbitConn = RunService.RenderStepped:Connect(function(dt)
+        if not Config.Troll.OrbitEnabled then return end
+        if not centerPart or not centerPart.Parent then return end
+        angle = angle + (Config.Troll.OrbitSpeed * dt)
+        local x = math.cos(angle) * 1.5
+        local z = math.sin(angle) * 1.5
+        TrollOrbitPart.CFrame = centerPart.CFrame * CFrame.new(x, 0.8, z)
+    end)
+end
+
+local function StopOrbit()
+    if TrollOrbitConn then TrollOrbitConn:Disconnect() TrollOrbitConn = nil end
+    if TrollOrbitPart then TrollOrbitPart:Destroy() TrollOrbitPart = nil end
+end
+
+local function UpdateAnnoyBillboards()
+    if Config.Troll.AnnoyPlayers then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                if not TrollBillboards[p] then
+                    local bb = Instance.new("BillboardGui")
+                    bb.Size = UDim2.new(0,100,0,40)
+                    bb.AlwaysOnTop = true
+                    bb.StudsOffset = Vector3.new(0, 1.5, 0)
+                    bb.Parent = p.Character.Head
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1,0,1,0)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = "😜 TROLL"
+                    lbl.TextColor3 = Color3_fromRGB(255,200,50)
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextSize = 20
+                    lbl.Parent = bb
+                    TrollBillboards[p] = bb
+                end
+            end
+        end
+    else
+        for p, bb in pairs(TrollBillboards) do
+            pcall(function() bb:Destroy() end)
+            TrollBillboards[p] = nil
+        end
+    end
+end
+
 -- Main Loop
 local PrevNoclip = false
 local PrevInvis = false
@@ -878,6 +1069,12 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     elseif not Config.Others.AntiRecoil and AntiRecoilConnection then
         StopAntiRecoil()
     end
+
+    -- Troll features
+    if Config.Troll.Spin and not TrollSpinConn then StartSpin() elseif not Config.Troll.Spin and TrollSpinConn then StopSpin() end
+    if Config.Troll.AttachEnabled and not TrollAttachConn then StartAttach() elseif not Config.Troll.AttachEnabled and TrollAttachConn then StopAttach() end
+    if Config.Troll.OrbitEnabled and not TrollOrbitConn then StartOrbit() elseif not Config.Troll.OrbitEnabled and TrollOrbitConn then StopOrbit() end
+    UpdateAnnoyBillboards()
 end))
 
 -- Character Reset
