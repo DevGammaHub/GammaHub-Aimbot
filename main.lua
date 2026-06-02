@@ -30,12 +30,38 @@ local ESP_Store = {}
 local Connections = {}
 local UI_Store = {}
 
+local InputHeld = {}
+local function IsHotkeyDown(key)
+    if typeof(key) ~= "EnumItem" then return false end
+    if key.EnumType == Enum.KeyCode then
+        return InputHeld[key] == true
+    elseif key.EnumType == Enum.UserInputType then
+        return InputHeld[key] == true
+    end
+    return false
+end
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        InputHeld[input.KeyCode] = true
+    else
+        InputHeld[input.UserInputType] = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        InputHeld[input.KeyCode] = false
+    else
+        InputHeld[input.UserInputType] = false
+    end
+end)
+
 -- Configuration
 local Config = {
     Global = { MenuOpen = true, Keybind = Enum.KeyCode.Insert, LockGUI = false },
     Aimbot = { Enabled = true, Key = Enum.KeyCode.E, FOV = 100, Smoothness = 0.5, AimPart = "Head", WallCheck = true, Prediction = 0.05 },
     Triggerbot = { Enabled = false, Key = Enum.KeyCode.T, Delay = 0.1, Randomization = 0.05, MaxDistance = 1000 },
-    Visuals = { Enabled = true, TeamCheck = true, Box = true, BoxOutline = true, Skeleton = true, HeadCircle = true, ViewLine = true, Snaplines = false, Names = true, Info = true, RenderDistance = 2500, ColorVisible = Color3_fromRGB(0,255,128), ColorHidden = Color3_fromRGB(255,50,50), ColorText = Color3_fromRGB(255,255,255) },
+    Visuals = { Enabled = true, TeamCheck = true, NPCs = true, Box = true, BoxOutline = true, Skeleton = true, HeadCircle = true, ViewLine = true, Snaplines = false, Names = true, Info = true, RenderDistance = 2500, ColorVisible = Color3_fromRGB(0,255,128), ColorHidden = Color3_fromRGB(255,50,50), ColorText = Color3_fromRGB(255,255,255) },
     FOV_Circle = { Enabled = true, Color = Color3_fromRGB(255,255,255), Transparency = 0.5, Thickness = 1, NumSides = 60 },
     Players = { Fly = false, Noclip = false, Invisibility = false, Godmode = false, FlySpeed = 50, WalkSpeed = 16 },
     Others = { AntiRecoil = false, RecoilStrength = 5 },
@@ -67,7 +93,12 @@ local MainFrameInstance
 local StatusLabel
 local function UpdateStatusLabel()
     if StatusLabel then
-        StatusLabel.Text = "Insert = Toggle | Drag = Top Bar | Lock: " .. (Config.Global.LockGUI and "On" or "Off")
+        StatusLabel.Text = string.format(
+            "Insert = Toggle | Drag = Top Bar | Lock: %s | Aim: %s | Trigger: %s | Troll: K/L/O/P",
+            Config.Global.LockGUI and "On" or "Off",
+            (typeof(Config.Aimbot.Key) == "EnumItem" and Config.Aimbot.Key.Name) or "E",
+            (typeof(Config.Triggerbot.Key) == "EnumItem" and Config.Triggerbot.Key.Name) or "T"
+        )
     end
 end
 function Library:CreateUI()
@@ -94,29 +125,6 @@ function Library:CreateUI()
         local delta = input.Position - dragStart
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
-    Main.InputBegan:Connect(function(input)
-        if not Main.Visible or Config.Global.LockGUI then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if input.Target and input.Target:IsDescendantOf(Top) then
-                if input.Target ~= Top and input.Target ~= Title then
-                    return
-                end
-            end
-            local absPos = Main.AbsolutePosition
-            local relY = input.Position.Y - absPos.Y
-            if relY < 0 or relY > 40 then return end
-            dragging = true
-            dragStart = input.Position
-            startPos = Main.Position
-            dragInput = input
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    dragInput = nil
-                end
-            end)
-        end
-    end)
     UserInputService.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement and dragging and Main.Visible then
             update(input)
@@ -146,7 +154,7 @@ function Library:CreateUI()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Text = "GammaHub · Universal FPS"
 
-    local StatusLabel = Instance.new("TextLabel", Top)
+    StatusLabel = Instance.new("TextLabel", Top)
     StatusLabel.Size = UDim2.new(1, -100, 0.5, 0)
     StatusLabel.Position = UDim2.new(0, 10, 0, 20)
     StatusLabel.BackgroundTransparency = 1
@@ -181,6 +189,26 @@ function Library:CreateUI()
 
     local CloseBtn = Instance.new("TextButton", Top); CloseBtn.Size = UDim2.new(0,28,0,28); CloseBtn.Position = UDim2.new(1, -36, 0.5, -14); CloseBtn.Text = "X"; CloseBtn.BackgroundColor3 = Color3_fromRGB(35,35,35); CloseBtn.TextColor3 = Color3_fromRGB(200,200,200); CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
     CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; Config.Global.MenuOpen = false end)
+
+    Top.InputBegan:Connect(function(input)
+        if not Main.Visible or Config.Global.LockGUI then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+        if input.Target and input.Target:IsDescendantOf(Top) then
+            if input.Target:IsA("GuiButton") or input.Target:IsA("TextBox") then
+                return
+            end
+        end
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+        dragInput = input
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                dragInput = nil
+            end
+        end)
+    end)
 
     UpdateStatusLabel()
 
@@ -275,6 +303,11 @@ table.insert(Connections, UserInputService.InputBegan:Connect(function(input, ga
             end)
         end
     end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Config.Triggerbot.Key then
+        if UserInputService:GetFocusedTextBox() then return end
+        Config.Triggerbot.Enabled = not Config.Triggerbot.Enabled
+        SendNotification("Triggerbot " .. (Config.Triggerbot.Enabled and "enabled" or "disabled"), Color3_fromRGB(255,200,0))
+    end
 end))
 
 -- Build tabs and controls
@@ -297,6 +330,7 @@ TrigTab:AddSlider("Max Distance", Config.Triggerbot, "MaxDistance", 50, 3000, fa
 local VisTab = Window:CreateTab("Visuals")
 VisTab:AddToggle("Enabled", Config.Visuals, "Enabled")
 VisTab:AddToggle("TeamCheck", Config.Visuals, "TeamCheck")
+VisTab:AddToggle("NPCs", Config.Visuals, "NPCs")
 VisTab:AddToggle("Box", Config.Visuals, "Box")
 VisTab:AddToggle("Names", Config.Visuals, "Names")
 VisTab:AddToggle("Info", Config.Visuals, "Info")
@@ -505,18 +539,34 @@ end
 local function StopAntiRecoil() if AntiRecoilConnection then AntiRecoilConnection:Disconnect(); AntiRecoilConnection = nil end end
 
 -- Troll features
-local TrollSpinConn, TrollAttachConn, TrollOrbitConn, TrollOrbitPart
+local TrollSpinConn, TrollAttachConn, TrollOrbitConn, TrollOrbitPart, TrollSpinBAV
 local function StartSpin()
     if TrollSpinConn then return end
-    local char = LocalPlayer.Character; if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    if not hrp then return end
-    TrollSpinConn = RunService.RenderStepped:Connect(function(dt)
+    TrollSpinConn = RunService.RenderStepped:Connect(function()
         if not Config.Troll.Spin then return end
-        if hrp and hrp.Parent then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.Troll.SpinSpeed * 4) * dt, 0) end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        if not hrp then return end
+
+        -- ensure BodyAngularVelocity exists and is parented to the root
+        if not TrollSpinBAV or not TrollSpinBAV.Parent or TrollSpinBAV.Parent ~= hrp then
+            if TrollSpinBAV then pcall(function() TrollSpinBAV:Destroy() end) end
+            TrollSpinBAV = Instance.new("BodyAngularVelocity")
+            TrollSpinBAV.Name = "GammaHubSpin"
+            TrollSpinBAV.MaxTorque = Vector3.new(0, math.huge, 0)
+            TrollSpinBAV.Parent = hrp
+        end
+
+        -- set angular velocity around Y axis (radians/sec)
+        local ang = math.rad(Config.Troll.SpinSpeed * 4)
+        TrollSpinBAV.AngularVelocity = Vector3.new(0, ang, 0)
     end)
 end
-local function StopSpin() if TrollSpinConn then TrollSpinConn:Disconnect(); TrollSpinConn = nil end end
+local function StopSpin()
+    if TrollSpinConn then TrollSpinConn:Disconnect(); TrollSpinConn = nil end
+    if TrollSpinBAV then pcall(function() TrollSpinBAV:Destroy() end); TrollSpinBAV = nil end
+end
 
 local function StartAttach()
     if TrollAttachConn then return end
@@ -591,7 +641,7 @@ end)
 task.spawn(function()
     while ScriptRunning do
         local DidFire = false
-        if Config.Triggerbot.Enabled then
+        if Config.Triggerbot.Enabled or IsHotkeyDown(Config.Triggerbot.Key) then
             local Origin = Camera.CFrame.Position
             local Direction = Camera.CFrame.LookVector * Config.Triggerbot.MaxDistance
             local params = RaycastParams.new(); params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}; params.FilterType = Enum.RaycastFilterType.Exclude; params.IgnoreWater = true
@@ -626,7 +676,12 @@ local function MainRender()
     FOVCircle.Visible = Config.FOV_Circle.Enabled
 
     local AimbotKeyHeld = false
-    if Config.Aimbot.Enabled then local K = Config.Aimbot.Key if typeof(K) == "EnumItem" then if K.EnumType == Enum.KeyCode then AimbotKeyHeld = UserInputService:IsKeyDown(K) elseif K.EnumType == Enum.UserInputType then AimbotKeyHeld = UserInputService:IsMouseButtonPressed(K) end end end
+    if Config.Aimbot.Enabled then
+        local K = Config.Aimbot.Key
+        if typeof(K) == "EnumItem" then
+            AimbotKeyHeld = IsHotkeyDown(K)
+        end
+    end
 
     local ClosestTarget = nil; local MinDist = Config.Aimbot.FOV
     local AllPlayers = Players:GetPlayers()
@@ -648,22 +703,179 @@ local function MainRender()
 
         if Config.Visuals.Enabled then
             local MainColor = Config.Visuals.ColorVisible
-            if Config.Visuals.Box then
-                local ScaleFactor = 1000/Dist
-                local BoxSizeY = 5 * ScaleFactor; local BoxSizeX = 3.2 * ScaleFactor
-                local BoxPos = Vector2_new(RootPos.X - BoxSizeX/2, RootPos.Y - BoxSizeY/2)
-                D.Box.Size = Vector2_new(BoxSizeX, BoxSizeY); D.Box.Position = BoxPos; D.Box.Color = MainColor; D.Box.Visible = true
-            else D.Box.Visible = false end
-            if Config.Visuals.Names then D.Name.Text = plr.Name; D.Name.Position = Vector2_new(RootPos.X, RootPos.Y - 40); D.Name.Size = 14; D.Name.Color = Config.Visuals.ColorText; D.Name.Visible = true else D.Name.Visible = false end
-            if Config.Visuals.Info then D.Info.Text = tostring(math.floor(Dist)) .. "m"; D.Info.Position = Vector2_new(RootPos.X, RootPos.Y + 40); D.Info.Size = 12; D.Info.Color = Config.Visuals.ColorText; D.Info.Visible = true else D.Info.Visible = false end
-        else HideAll(D) end
+            if Config.Visuals.Box or Config.Visuals.HeadCircle or Config.Visuals.ViewLine or Config.Visuals.Snaplines or Config.Visuals.Names or Config.Visuals.Info then
+                local headPos, headVis = WTVP(Camera, Head.Position)
+                local footPos, footVis = WTVP(Camera, Root.Position - Vector3_new(0, 3, 0))
+                if not headVis or not footVis then HideAll(D); continue end
+                local height = math.clamp(math.abs(footPos.Y - headPos.Y), 60, 500)
+                local width = math.clamp(height * 0.35, 32, 220)
+                local boxPos = Vector2_new(headPos.X - width/2, headPos.Y)
+                if Config.Visuals.Box then
+                    D.Box.Size = Vector2_new(width, height)
+                    D.Box.Position = boxPos
+                    D.Box.Color = MainColor
+                    D.Box.Visible = true
+                else
+                    D.Box.Visible = false
+                end
+                D.BoxOutline.Size = Vector2_new(width + 2, height + 2)
+                D.BoxOutline.Position = boxPos - Vector2_new(1, 1)
+                D.BoxOutline.Color = Color3_fromRGB(0, 0, 0)
+                D.BoxOutline.Visible = Config.Visuals.Box and Config.Visuals.BoxOutline
+                if Config.Visuals.HeadCircle then
+                    D.HeadCircle.Position = Vector2_new(headPos.X, headPos.Y)
+                    D.HeadCircle.Radius = 10
+                    D.HeadCircle.Color = MainColor
+                    D.HeadCircle.Visible = true
+                else
+                    D.HeadCircle.Visible = false
+                end
+                if Config.Visuals.ViewLine then
+                    D.ViewLine.From = Vector2_new(ViewportSize.X / 2, ViewportSize.Y)
+                    D.ViewLine.To = Vector2_new(headPos.X, headPos.Y)
+                    D.ViewLine.Color = MainColor
+                    D.ViewLine.Visible = true
+                else
+                    D.ViewLine.Visible = false
+                end
+                if Config.Visuals.Snaplines then
+                    D.Snapline.From = Vector2_new(ViewportSize.X / 2, ViewportSize.Y)
+                    D.Snapline.To = Vector2_new(RootPos.X, RootPos.Y)
+                    D.Snapline.Color = MainColor
+                    D.Snapline.Visible = true
+                else
+                    D.Snapline.Visible = false
+                end
+                if Config.Visuals.Names then
+                    D.Name.Text = plr.Name
+                    D.Name.Position = Vector2_new(headPos.X, headPos.Y - 18)
+                    D.Name.Size = 14
+                    D.Name.Color = Config.Visuals.ColorText
+                    D.Name.Visible = true
+                else
+                    D.Name.Visible = false
+                end
+                if Config.Visuals.Info then
+                    D.Info.Text = tostring(Math_floor(Dist)) .. "m"
+                    D.Info.Position = Vector2_new(headPos.X, headPos.Y + 18)
+                    D.Info.Size = 12
+                    D.Info.Color = Config.Visuals.ColorText
+                    D.Info.Visible = true
+                else
+                    D.Info.Visible = false
+                end
+            else
+                HideAll(D)
+            end
+        else
+            HideAll(D)
+        end
 
         if AimbotKeyHeld then
             local HeadScreen = WTVP(Camera, Head.Position)
             local ScreenPos = Vector2_new(HeadScreen.X, HeadScreen.Y)
             local DistToMouse = (ScreenPos - MouseLoc).Magnitude
             if DistToMouse < MinDist then
-                if Config.Aimbot.WallCheck then MinDist = DistToMouse; ClosestTarget = Head else MinDist = DistToMouse; ClosestTarget = Head end
+                MinDist = DistToMouse
+                ClosestTarget = Head
+            end
+        end
+    end
+
+    if Config.Visuals.NPCs or Config.Aimbot.Enabled or Config.Triggerbot.Enabled then
+        for _, model in ipairs(Workspace:GetDescendants()) do
+            if not model:IsA("Model") then continue end
+            if Players:GetPlayerFromCharacter(model) then continue end
+            if model == LocalPlayer.Character then continue end
+            local humanoid = GetCharacterHumanoid(model)
+            local head = model:FindFirstChild("Head")
+            local root = GetCharacterRoot(model)
+            if not humanoid or humanoid.Health <= 0 or not head or not root then continue end
+            local D = ESP_Store[model]
+            if not D then InitializeDrawing(model); D = ESP_Store[model] end
+            local Dist = (root.Position - Camera.CFrame.Position).Magnitude
+            if Dist > Config.Visuals.RenderDistance then HideAll(D); continue end
+            local RootPos, RootVis = WTVP(Camera, root.Position)
+            if not RootVis then HideAll(D); continue end
+
+            if Config.Visuals.Enabled then
+                local MainColor = Config.Visuals.ColorHidden
+                if Config.Visuals.Box or Config.Visuals.HeadCircle or Config.Visuals.ViewLine or Config.Visuals.Snaplines or Config.Visuals.Names or Config.Visuals.Info then
+                    local headPos, headVis = WTVP(Camera, head.Position)
+                    local footPos, footVis = WTVP(Camera, root.Position - Vector3_new(0, 3, 0))
+                    if not headVis or not footVis then HideAll(D); continue end
+                    local height = math.clamp(math.abs(footPos.Y - headPos.Y), 60, 500)
+                    local width = math.clamp(height * 0.35, 32, 220)
+                    local boxPos = Vector2_new(headPos.X - width/2, headPos.Y)
+                    if Config.Visuals.Box then
+                        D.Box.Size = Vector2_new(width, height)
+                        D.Box.Position = boxPos
+                        D.Box.Color = MainColor
+                        D.Box.Visible = true
+                    else
+                        D.Box.Visible = false
+                    end
+                    D.BoxOutline.Size = Vector2_new(width + 2, height + 2)
+                    D.BoxOutline.Position = boxPos - Vector2_new(1, 1)
+                    D.BoxOutline.Color = Color3_fromRGB(0, 0, 0)
+                    D.BoxOutline.Visible = Config.Visuals.Box and Config.Visuals.BoxOutline
+                    if Config.Visuals.HeadCircle then
+                        D.HeadCircle.Position = Vector2_new(headPos.X, headPos.Y)
+                        D.HeadCircle.Radius = 10
+                        D.HeadCircle.Color = MainColor
+                        D.HeadCircle.Visible = true
+                    else
+                        D.HeadCircle.Visible = false
+                    end
+                    if Config.Visuals.ViewLine then
+                        D.ViewLine.From = Vector2_new(ViewportSize.X / 2, ViewportSize.Y)
+                        D.ViewLine.To = Vector2_new(headPos.X, headPos.Y)
+                        D.ViewLine.Color = MainColor
+                        D.ViewLine.Visible = true
+                    else
+                        D.ViewLine.Visible = false
+                    end
+                    if Config.Visuals.Snaplines then
+                        D.Snapline.From = Vector2_new(ViewportSize.X / 2, ViewportSize.Y)
+                        D.Snapline.To = Vector2_new(RootPos.X, RootPos.Y)
+                        D.Snapline.Color = MainColor
+                        D.Snapline.Visible = true
+                    else
+                        D.Snapline.Visible = false
+                    end
+                    if Config.Visuals.Names then
+                        D.Name.Text = model.Name
+                        D.Name.Position = Vector2_new(headPos.X, headPos.Y - 18)
+                        D.Name.Size = 14
+                        D.Name.Color = Config.Visuals.ColorText
+                        D.Name.Visible = true
+                    else
+                        D.Name.Visible = false
+                    end
+                    if Config.Visuals.Info then
+                        D.Info.Text = tostring(Math_floor(Dist)) .. "m"
+                        D.Info.Position = Vector2_new(headPos.X, headPos.Y + 18)
+                        D.Info.Size = 12
+                        D.Info.Color = Config.Visuals.ColorText
+                        D.Info.Visible = true
+                    else
+                        D.Info.Visible = false
+                    end
+                else
+                    HideAll(D)
+                end
+            else
+                HideAll(D)
+            end
+
+            if AimbotKeyHeld then
+                local HeadScreen = WTVP(Camera, head.Position)
+                local ScreenPos = Vector2_new(HeadScreen.X, HeadScreen.Y)
+                local DistToMouse = (ScreenPos - MouseLoc).Magnitude
+                if DistToMouse < MinDist then
+                    MinDist = DistToMouse
+                    ClosestTarget = head
+                end
             end
         end
     end
