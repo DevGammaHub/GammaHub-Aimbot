@@ -89,18 +89,24 @@ function Library:CreateUI()
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
     Main.InputBegan:Connect(function(input)
+        if not Main.Visible then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = Main.Position
             dragInput = input
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    dragInput = nil
+                end
             end)
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then update(input) end
+        if input.UserInputType == Enum.UserInputType.MouseMovement and input == dragInput and dragging and Main.Visible then
+            update(input)
+        end
     end)
 
     -- Left navigation
@@ -196,7 +202,7 @@ local Window, GUIInstance = Library:CreateUI()
 
 -- Toggle menu with Insert key
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Config.Global.Keybind then
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Config.Global.Keybind then
         if MainFrameInstance then
             MainFrameInstance.Visible = not MainFrameInstance.Visible
             Config.Global.MenuOpen = MainFrameInstance.Visible
