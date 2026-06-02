@@ -4,6 +4,9 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
+local ContextActionService = game:GetService("ContextActionService")
+
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
@@ -73,13 +76,22 @@ local Config = {
         Thickness = 1,
         NumSides = 60,
     },
-    Players = {  -- New Category
+    Players = {
         Fly = false,
         Noclip = false,
         Invisibility = false,
         Godmode = false,
+        Reset = false,
         FlySpeed = 50,
         WalkSpeed = 16,
+    },
+    Server = {
+        FakeLag = false,
+    },
+    Troll = {
+        Spin = false,
+        Fling = false,
+        ChatSpam = false,
     },
     Others = {
         AntiRecoil = false,
@@ -94,7 +106,6 @@ local FlyConnection = nil
 -- Invisibility vars
 local InvisActive = false
 local InvisSavedCFrame = nil
-local InvisRootPart = nil
 local InvisUpdateConn = nil
 
 -- Godmode vars
@@ -102,6 +113,12 @@ local GodmodeConnection = nil
 
 -- Anti Recoil vars
 local AntiRecoilConnection = nil
+
+-- Spin vars
+local SpinConnection = nil
+
+-- Fake Lag
+local FakeLagConnection = nil
 
 local function SendNotification(text, color)
     local GUI = nil
@@ -162,8 +179,8 @@ function Library:CreateUI()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 550, 0, 380)
-    MainFrame.Position = UDim2.new(0.5, -275, 0.5, -190)
+    MainFrame.Size = UDim2.new(0, 550, 0, 450)
+    MainFrame.Position = UDim2.new(0.5, -275, 0.5, -225)
     MainFrame.BackgroundColor3 = Color3_fromRGB(25, 25, 25)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -401,52 +418,6 @@ function Library:CreateUI()
             Btn.MouseButton1Click:Connect(Callback)
         end
 
-        function Elements:AddKeybind(Text, ConfigTable, ConfigKey)
-            local KeyFrame = Instance.new("Frame")
-            KeyFrame.Size = UDim2.new(1, 0, 0, 30)
-            KeyFrame.BackgroundColor3 = Color3_fromRGB(35, 35, 35)
-            KeyFrame.Parent = Page
-            Instance.new("UICorner", KeyFrame).CornerRadius = UDim.new(0,4)
-
-            local Label = Instance.new("TextLabel")
-            Label.Text = Text
-            Label.Size = UDim2.new(0.6, 0, 1, 0)
-            Label.Position = UDim2.new(0, 10, 0, 0)
-            Label.BackgroundTransparency = 1
-            Label.TextColor3 = Color3_fromRGB(220, 220, 220)
-            Label.Font = Enum.Font.Gotham
-            Label.TextSize = 13
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = KeyFrame
-
-            local KeyButton = Instance.new("TextButton")
-            KeyButton.Text = ConfigTable[ConfigKey].Name
-            KeyButton.Size = UDim2.new(0, 80, 0, 20)
-            KeyButton.Position = UDim2.new(1, -90, 0.5, -10)
-            KeyButton.BackgroundColor3 = Color3_fromRGB(60, 60, 60)
-            KeyButton.TextColor3 = Color3_fromRGB(255, 255, 255)
-            KeyButton.Font = Enum.Font.GothamBold
-            KeyButton.TextSize = 12
-            KeyButton.Parent = KeyFrame
-            Instance.new("UICorner", KeyButton).CornerRadius = UDim.new(0, 4)
-
-            KeyButton.MouseButton1Click:Connect(function()
-                KeyButton.Text = ". . ."
-                local InputConnection
-                InputConnection = UserInputService.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.Keyboard then
-                        ConfigTable[ConfigKey] = input.KeyCode
-                        KeyButton.Text = input.KeyCode.Name
-                        InputConnection:Disconnect()
-                    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                        ConfigTable[ConfigKey] = Enum.UserInputType.MouseButton2
-                        KeyButton.Text = "Mouse2"
-                        InputConnection:Disconnect()
-                    end
-                end)
-            end)
-        end
-
         return Elements
     end
     return Tabs, ScreenGui
@@ -482,14 +453,25 @@ VisTab:AddToggle("ViewLine", Config.Visuals, "ViewLine")
 VisTab:AddToggle("Snaplines", Config.Visuals, "Snaplines")
 VisTab:AddSlider("Distance", Config.Visuals, "RenderDistance", 100, 5000, false)
 
--- NEW PLAYERS TAB
 local PlayersTab = Window:CreateTab("Players")
 PlayersTab:AddToggle("Fly", Config.Players, "Fly")
 PlayersTab:AddSlider("Fly Speed", Config.Players, "FlySpeed", 10, 200, false)
 PlayersTab:AddToggle("Noclip", Config.Players, "Noclip")
 PlayersTab:AddToggle("Invisibility [experimental]", Config.Players, "Invisibility")
 PlayersTab:AddToggle("Godmode", Config.Players, "Godmode")
+PlayersTab:AddToggle("Reset (Suicide)", Config.Players, "Reset")
 PlayersTab:AddSlider("Walk Speed", Config.Players, "WalkSpeed", 1, 100, false)
+
+local ServerTab = Window:CreateTab("Server")
+ServerTab:AddToggle("Fake Lag", Config.Server, "FakeLag")
+ServerTab:AddButton("Rejoin Server", function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+end)
+
+local TrollTab = Window:CreateTab("Troll")
+TrollTab:AddToggle("Spin", Config.Troll, "Spin")
+TrollTab:AddToggle("Fling", Config.Troll, "Fling")
+TrollTab:AddToggle("Chat Spam", Config.Troll, "ChatSpam")
 
 local OthersTab = Window:CreateTab("Others")
 OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
@@ -511,21 +493,16 @@ SetTab:AddButton("UNLOAD THE SCRIPT", function()
     table.clear(ESP_Store)
     if FOVCircle then FOVCircle:Remove() end
     for _, ui in pairs(UI_Store) do ui:Destroy() end
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildWhichIsA("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
-    end
-    if AntiRecoilConnection then AntiRecoilConnection:Disconnect() AntiRecoilConnection = nil end
-    if GodmodeConnection then GodmodeConnection:Disconnect() GodmodeConnection = nil end
+    if AntiRecoilConnection then AntiRecoilConnection:Disconnect() end
+    if GodmodeConnection then GodmodeConnection:Disconnect() end
+    if SpinConnection then SpinConnection:Disconnect() end
+    if FakeLagConnection then FakeLagConnection:Disconnect() end
 end)
 
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Config.Global.Keybind then
         Config.Global.MenuOpen = not Config.Global.MenuOpen
-        if MainFrameInstance then
-            MainFrameInstance.Visible = Config.Global.MenuOpen
-        end
+        if MainFrameInstance then MainFrameInstance.Visible = Config.Global.MenuOpen end
     end
     if input.KeyCode == Config.Triggerbot.Key then
         Config.Triggerbot.Enabled = not Config.Triggerbot.Enabled
@@ -538,6 +515,22 @@ table.insert(Connections, UserInputService.InputBegan:Connect(function(input)
         end
     end
 end))
+
+-- Reset (Suicide) - F2
+ContextActionService:BindAction('Kill', function(_, state)
+    if state == Enum.UserInputState.Begin and Config.Players.Reset then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character:FindFirstChild("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead)
+        end
+    end
+end, true, Enum.KeyCode.F2)
+
+-- Rejoin - F1
+ContextActionService:BindAction('Rejoin', function(_, state)
+    if state == Enum.UserInputState.Begin then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+    end
+end, true, Enum.KeyCode.F1)
 
 local GlobalRaycastParams = RaycastParams.new()
 GlobalRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -579,13 +572,6 @@ local function IsEnemy(plr)
             local TheirAttr = plr:GetAttribute(attr)
             if TheirAttr and MyAttr == TheirAttr then return false end
         end
-    end
-    local PL = plr:FindFirstChild("leaderstats")
-    local LL = LocalPlayer:FindFirstChild("leaderstats")
-    if PL and LL then
-        local MT = LL:FindFirstChild("Team") or LL:FindFirstChild("Side")
-        local TT = PL:FindFirstChild("Team") or PL:FindFirstChild("Side")
-        if MT and TT and MT.Value == TT.Value then return false end
     end
     return true
 end
@@ -658,8 +644,7 @@ local R6_Links = {
     {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
 }
 
--- ====================== PLAYER FUNCTIONS ======================
-
+-- Player Functions
 local function ToggleFly(state)
     if state then
         local character = LocalPlayer.Character
@@ -714,10 +699,8 @@ local function StartGodmode()
     if not char then return end
     local hum = char:FindFirstChildWhichIsA("Humanoid")
     if not hum then return end
-
     hum.MaxHealth = 9e9
     hum.Health = 9e9
-
     GodmodeConnection = hum.HealthChanged:Connect(function()
         if hum.Health < 9e9 then
             hum.MaxHealth = 9e9
@@ -748,7 +731,6 @@ local function StartInvisibility()
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     InvisActive = true
-    InvisRootPart = root
     InvisSavedCFrame = root.CFrame
     for _, obj in pairs(character:GetDescendants()) do
         if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then
@@ -768,15 +750,12 @@ local function StartInvisibility()
         end
     end
     local hrp = character:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hrp.CFrame = hrp.CFrame * CFrame.new(0, -5000, 0)
-    end
+    if hrp then hrp.CFrame = hrp.CFrame * CFrame.new(0, -5000, 0) end
     InvisUpdateConn = RunService.RenderStepped:Connect(function()
         if not InvisActive or not Config.Players.Invisibility then return end
         local char = LocalPlayer.Character
-        if not char then return end
-        local root2 = char:FindFirstChild("HumanoidRootPart")
-        if root2 then
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root2 = char.HumanoidRootPart
             root2.CFrame = CFrame.new(root2.CFrame.X, root2.CFrame.Y, root2.CFrame.Z)
         end
     end)
@@ -812,12 +791,10 @@ local function StopInvisibility()
     InvisSavedCFrame = nil
 end
 
--- ANTI RECOIL
 local function StartAntiRecoil()
     if AntiRecoilConnection then return end
     AntiRecoilConnection = RunService.RenderStepped:Connect(function()
-        if not ScriptRunning then return end
-        if not Config.Others.AntiRecoil then return end
+        if not ScriptRunning or not Config.Others.AntiRecoil then return end
         if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
             mousemoverel(0, Config.Others.RecoilStrength)
         end
@@ -831,65 +808,66 @@ local function StopAntiRecoil()
     end
 end
 
--- Main Loop
-local PrevNoclip = false
-local PrevInvis = false
-local PrevFly = false
-local PrevGodmode = false
+local function ToggleFakeLag(state)
+    if FakeLagConnection then FakeLagConnection:Disconnect() end
+    if state then
+        FakeLagConnection = RunService.RenderStepped:Connect(function()
+            if not Config.Server.FakeLag then return end
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.Anchored = true
+                task.wait(math.random(0.1,0.9))
+                root.Anchored = false
+                task.wait(math.random(0.1,0.9))
+            end
+        end)
+    end
+end
 
+local function ToggleSpin(state)
+    if SpinConnection then SpinConnection:Disconnect() end
+    if state then
+        SpinConnection = RunService.RenderStepped:Connect(function()
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = root.CFrame * CFrame.Angles(0, 0.4, 0)
+            end
+        end)
+    end
+end
+
+-- Main Loop
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     if not ScriptRunning then return end
 
-    -- Fly
-    if Config.Players.Fly and not FlyConnection then
-        ToggleFly(true)
-    elseif not Config.Players.Fly and FlyConnection then
-        ToggleFly(false)
-    end
-
-    -- Noclip
-    if Config.Players.Noclip then
-        ToggleNoclip(true)
-    elseif PrevNoclip and not Config.Players.Noclip then
-        ToggleNoclip(false)
-    end
-    PrevNoclip = Config.Players.Noclip
-
-    -- WalkSpeed
+    -- Players
+    if Config.Players.Fly and not FlyConnection then ToggleFly(true) elseif not Config.Players.Fly and FlyConnection then ToggleFly(false) end
+    if Config.Players.Noclip then ToggleNoclip(true) else ToggleNoclip(false) end
+    if Config.Players.Godmode and not GodmodeConnection then StartGodmode() elseif not Config.Players.Godmode and GodmodeConnection then StopGodmode() end
+    if Config.Players.Invisibility and not InvisActive then StartInvisibility() elseif not Config.Players.Invisibility and InvisActive then StopInvisibility() end
     ApplySpeed()
 
-    -- Godmode
-    if Config.Players.Godmode and not GodmodeConnection then
-        StartGodmode()
-    elseif not Config.Players.Godmode and GodmodeConnection then
-        StopGodmode()
+    -- Server
+    ToggleFakeLag(Config.Server.FakeLag)
+
+    -- Troll
+    ToggleSpin(Config.Troll.Spin)
+    if Config.Troll.Fling then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then root.Velocity = Vector3.new(math.random(-150,150), 50, math.random(-150,150)) end
+        Config.Troll.Fling = false
+    end
+    if Config.Troll.ChatSpam then
+        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("GammaHub owns this server " .. math.random(100,999), "All")
     end
 
-    -- Invisibility
-    if Config.Players.Invisibility and not InvisActive then
-        StartInvisibility()
-    elseif not Config.Players.Invisibility and InvisActive then
-        StopInvisibility()
-    end
-
-    -- Anti Recoil
-    if Config.Others.AntiRecoil and not AntiRecoilConnection then
-        StartAntiRecoil()
-    elseif not Config.Others.AntiRecoil and AntiRecoilConnection then
-        StopAntiRecoil()
-    end
+    -- Others
+    if Config.Others.AntiRecoil and not AntiRecoilConnection then StartAntiRecoil() elseif not Config.Others.AntiRecoil and AntiRecoilConnection then StopAntiRecoil() end
 end))
 
--- Character Reset
-LocalPlayer.CharacterAdded:Connect(function(char)
+LocalPlayer.CharacterAdded:Connect(function()
     InvisActive = false
-    InvisSavedCFrame = nil
-    if InvisUpdateConn then InvisUpdateConn:Disconnect() InvisUpdateConn = nil end
-    Config.Players.Invisibility = false
-    Config.Players.Fly = false
-    if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
-    if FlyBodyVelocity then FlyBodyVelocity:Destroy() FlyBodyVelocity = nil end
-    if GodmodeConnection then GodmodeConnection:Disconnect() GodmodeConnection = nil end
+    if InvisUpdateConn then InvisUpdateConn:Disconnect() end
 end)
 
 -- Triggerbot Thread
@@ -899,7 +877,7 @@ task.spawn(function()
         if Config.Triggerbot.Enabled then
             local Origin = Camera.CFrame.Position
             local Direction = Camera.CFrame.LookVector * Config.Triggerbot.MaxDistance
-            GlobalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera, Workspace:FindFirstChild("RaycastIgnore")}
+            GlobalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
             local Result = Workspace:Raycast(Origin, Direction, GlobalRaycastParams)
             if Result and Result.Instance then
                 local HitModel = Result.Instance:FindFirstAncestorOfClass("Model")
@@ -911,8 +889,7 @@ task.spawn(function()
                             mouse1press()
                             task.wait(0.03)
                             mouse1release()
-                            local ShotDelay = Config.Triggerbot.Delay + (math.random() * Config.Triggerbot.Randomization)
-                            task.wait(ShotDelay)
+                            task.wait(Config.Triggerbot.Delay + (math.random() * Config.Triggerbot.Randomization))
                             DidFire = true
                         end
                     end
@@ -966,11 +943,7 @@ local function MainRender()
         local RootPos, RootVis = WTVP(Camera, RootPos3D)
         if not RootVis then HideAll(D); continue end
 
-        local TargetHead = Head
-        local IsVisible = false
-        if Config.Visuals.Enabled or (AimbotKeyHeld and Config.Aimbot.WallCheck) then
-            IsVisible = CheckVisibility(Head, Char)
-        end
+        local IsVisible = CheckVisibility(Head, Char)
         local MainColor = IsVisible and Config.Visuals.ColorVisible or Config.Visuals.ColorHidden
 
         if Config.Visuals.Enabled then
@@ -981,9 +954,19 @@ local function MainRender()
             local BoxPos = Vector2_new(RootPos.X - BoxSizeX/2, RootPos.Y - BoxSizeY/2)
 
             if Config.Visuals.Box then
-                if Config.Visuals.BoxOutline then D.BoxOutline.Size = Vector2_new(BoxSizeX, BoxSizeY); D.BoxOutline.Position = BoxPos; D.BoxOutline.Visible = true else D.BoxOutline.Visible = false end
-                D.Box.Size = Vector2_new(BoxSizeX, BoxSizeY); D.Box.Position = BoxPos; D.Box.Color = MainColor; D.Box.Visible = true
-            else D.Box.Visible = false; D.BoxOutline.Visible = false end
+                if Config.Visuals.BoxOutline then 
+                    D.BoxOutline.Size = Vector2_new(BoxSizeX, BoxSizeY)
+                    D.BoxOutline.Position = BoxPos
+                    D.BoxOutline.Visible = true 
+                end
+                D.Box.Size = Vector2_new(BoxSizeX, BoxSizeY)
+                D.Box.Position = BoxPos
+                D.Box.Color = MainColor
+                D.Box.Visible = true
+            else 
+                D.Box.Visible = false
+                D.BoxOutline.Visible = false 
+            end
 
             if Config.Visuals.Names then
                 D.Name.Text = plr.Name
@@ -1035,7 +1018,6 @@ local function MainRender()
                 for j = 1, #Links do
                     local Link = Links[j]
                     local LineObj = D.Skeleton[j]
-                    if not LineObj then break end
                     local P1 = Char:FindFirstChild(Link[1])
                     local P2 = Char:FindFirstChild(Link[2])
                     if P1 and P2 then
@@ -1060,15 +1042,14 @@ local function MainRender()
             HideAll(D)
         end
 
-        if AimbotKeyHeld then
-            local HeadScreen = WTVP(Camera, TargetHead.Position)
+        if AimbotKeyHeld and Head then
+            local HeadScreen = WTVP(Camera, Head.Position)
             local ScreenPos = Vector2_new(HeadScreen.X, HeadScreen.Y)
             local DistToMouse = (ScreenPos - MouseLoc).Magnitude
             if DistToMouse < MinDist then
-                if Config.Aimbot.WallCheck then
-                    if IsVisible then MinDist = DistToMouse; ClosestTarget = TargetHead end
-                else
-                    MinDist = DistToMouse; ClosestTarget = TargetHead
+                if not Config.Aimbot.WallCheck or IsVisible then
+                    MinDist = DistToMouse
+                    ClosestTarget = Head
                 end
             end
         end
@@ -1087,4 +1068,4 @@ end
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
 table.insert(Connections, Players.PlayerRemoving:Connect(function(plr) ClearDrawing(plr) end))
 
-warn("Universal FPS Gui by GammaHub Loaded! (v3 - Players Tab + Godmode)")
+warn("Universal FPS Gui by GammaHub Loaded! (v4 - Full with Players, Server, Troll)")
