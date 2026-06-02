@@ -80,6 +80,29 @@ function Library:CreateUI()
     MainFrameInstance = Main
     Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
 
+    -- Make the main frame draggable
+    Main.Active = true
+    local dragging = false
+    local dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    Main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+            dragInput = input
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+
     -- Left navigation
     local Nav = Instance.new("Frame", Main)
     Nav.Size = UDim2.new(0,140,1, -40); Nav.Position = UDim2.new(0,0,0,40); Nav.BackgroundColor3 = Color3_fromRGB(24,24,24)
@@ -171,6 +194,16 @@ end
 
 local Window, GUIInstance = Library:CreateUI()
 
+-- Toggle menu with Insert key
+table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Config.Global.Keybind then
+        if MainFrameInstance then
+            MainFrameInstance.Visible = not MainFrameInstance.Visible
+            Config.Global.MenuOpen = MainFrameInstance.Visible
+        end
+    end
+end))
+
 -- Build tabs and controls
 local AimTab = Window:CreateTab("Aimbot")
 AimTab:AddToggle("Enabled", Config.Aimbot, "Enabled")
@@ -228,6 +261,26 @@ SetTab:AddButton("UNLOAD SCRIPT", function()
     if LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
         if hum then hum.WalkSpeed = 16 end
+    end
+end)
+
+SetTab:AddButton("SERVER RESET", function()
+    local ev = ReplicatedStorage:FindFirstChild("GammaHub_EmoteEvent")
+    if ev and ev.FireServer then
+        pcall(function() ev:FireServer("Reset") end)
+        SendNotification("Server Reset requested", Color3_fromRGB(255,200,0))
+    else
+        SendNotification("Server event not found", Color3_fromRGB(200,60,60))
+    end
+end)
+
+SetTab:AddButton("SERVER REJOIN", function()
+    local ev = ReplicatedStorage:FindFirstChild("GammaHub_EmoteEvent")
+    if ev and ev.FireServer then
+        pcall(function() ev:FireServer("Rejoin") end)
+        SendNotification("Server Rejoin requested", Color3_fromRGB(255,200,0))
+    else
+        SendNotification("Server event not found", Color3_fromRGB(200,60,60))
     end
 end)
 
