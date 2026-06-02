@@ -32,14 +32,14 @@ local UI_Store = {}
 
 -- Configuration
 local Config = {
-    Global = { MenuOpen = true, Keybind = Enum.KeyCode.Insert },
+    Global = { MenuOpen = true, Keybind = Enum.KeyCode.Insert, LockGUI = false },
     Aimbot = { Enabled = true, Key = Enum.KeyCode.E, FOV = 100, Smoothness = 0.5, AimPart = "Head", WallCheck = true, Prediction = 0.05 },
     Triggerbot = { Enabled = false, Key = Enum.KeyCode.T, Delay = 0.1, Randomization = 0.05, MaxDistance = 1000 },
     Visuals = { Enabled = true, TeamCheck = true, Box = true, BoxOutline = true, Skeleton = true, HeadCircle = true, ViewLine = true, Snaplines = false, Names = true, Info = true, RenderDistance = 2500, ColorVisible = Color3_fromRGB(0,255,128), ColorHidden = Color3_fromRGB(255,50,50), ColorText = Color3_fromRGB(255,255,255) },
     FOV_Circle = { Enabled = true, Color = Color3_fromRGB(255,255,255), Transparency = 0.5, Thickness = 1, NumSides = 60 },
     Players = { Fly = false, Noclip = false, Invisibility = false, Godmode = false, FlySpeed = 50, WalkSpeed = 16 },
     Others = { AntiRecoil = false, RecoilStrength = 5 },
-    Troll = { Spin = false, SpinSpeed = 20, AttachEnabled = false, AttachTarget = "", OrbitEnabled = false, OrbitSpeed = 10 }
+    Troll = { Spin = false, SpinSpeed = 20, AttachEnabled = false, AttachTarget = "", OrbitEnabled = false, OrbitSpeed = 10, SpinKey = Enum.KeyCode.K, AttachKey = Enum.KeyCode.L, OrbitKey = Enum.KeyCode.O, StopKey = Enum.KeyCode.P }
 }
 
 -- Notifications
@@ -64,6 +64,12 @@ end
 -- UI Library (stylish)
 local Library = {}
 local MainFrameInstance
+local StatusLabel
+local function UpdateStatusLabel()
+    if StatusLabel then
+        StatusLabel.Text = "Insert = Toggle | Drag = Top Bar | Lock: " .. (Config.Global.LockGUI and "On" or "Off")
+    end
+end
 function Library:CreateUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "GammaHub_UI_"..math.random(1000,9999)
@@ -89,9 +95,13 @@ function Library:CreateUI()
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
     Main.InputBegan:Connect(function(input)
-        if not Main.Visible then return end
+        if not Main.Visible or Config.Global.LockGUI then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            -- only start dragging when clicking the top bar area (approx 40px)
+            if input.Target and input.Target:IsDescendantOf(Top) then
+                if input.Target ~= Top and input.Target ~= Title then
+                    return
+                end
+            end
             local absPos = Main.AbsolutePosition
             local relY = input.Position.Y - absPos.Y
             if relY < 0 or relY > 40 then return end
@@ -120,29 +130,59 @@ function Library:CreateUI()
     local navLayout = Instance.new("UIListLayout", Nav); navLayout.SortOrder = Enum.SortOrder.LayoutOrder; navLayout.Padding = UDim.new(0,8)
     local navPad = Instance.new("UIPadding", Nav); navPad.PaddingTop = UDim.new(0,10); navPad.PaddingLeft = UDim.new(0,8)
 
-    -- Top bar
-    local Top = Instance.new("Frame", Main); Top.Size = UDim2.new(1,0,0,40); Top.BackgroundTransparency = 1
+        -- Top bar
+    local Top = Instance.new("Frame", Main)
+    Top.Size = UDim2.new(1,0,0,40)
+    Top.BackgroundTransparency = 1
     Top.Active = true
-    local Title = Instance.new("TextLabel", Top); Title.Text = "GammaHub · Universal FPS"; Title.Size = UDim2.new(1, -20,1,0); Title.Position = UDim2.new(0,10,0,0); Title.BackgroundTransparency = 1; Title.TextColor3 = Color3_fromRGB(220,220,220); Title.Font = Enum.Font.GothamBold; Title.TextSize = 16; Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local Title = Instance.new("TextLabel", Top)
+    Title.Size = UDim2.new(1, -100, 0.5, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.TextColor3 = Color3_fromRGB(220,220,220)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Text = "GammaHub · Universal FPS"
+
+    local StatusLabel = Instance.new("TextLabel", Top)
+    StatusLabel.Size = UDim2.new(1, -100, 0.5, 0)
+    StatusLabel.Position = UDim2.new(0, 10, 0, 20)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.TextColor3 = Color3_fromRGB(180,180,180)
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.TextSize = 12
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
+    StatusLabel.TextWrapped = true
+    StatusLabel.ClipsDescendants = true
+    StatusLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    StatusLabel.ZIndex = 2
+    StatusLabel.Name = "StatusLabel"
+
+    local LockBtn = Instance.new("TextButton", Top)
+    LockBtn.Size = UDim2.new(0, 28, 0, 28)
+    LockBtn.Position = UDim2.new(1, -72, 0.5, -14)
+    LockBtn.Text = (Config.Global.LockGUI and "🔒" or "🔓")
+    LockBtn.BackgroundColor3 = Color3_fromRGB(35,35,35)
+    LockBtn.TextColor3 = Color3_fromRGB(200,200,200)
+    LockBtn.Font = Enum.Font.GothamBold
+    LockBtn.TextSize = 16
+    LockBtn.AutoButtonColor = true
+    Instance.new("UICorner", LockBtn).CornerRadius = UDim.new(0,6)
+
+    LockBtn.MouseButton1Click:Connect(function()
+        Config.Global.LockGUI = not Config.Global.LockGUI
+        LockBtn.Text = (Config.Global.LockGUI and "🔒" or "🔓")
+        UpdateStatusLabel()
+        SendNotification("GUI " .. (Config.Global.LockGUI and "locked" or "unlocked"), Color3_fromRGB(120,200,255))
+    end)
+
     local CloseBtn = Instance.new("TextButton", Top); CloseBtn.Size = UDim2.new(0,28,0,28); CloseBtn.Position = UDim2.new(1, -36, 0.5, -14); CloseBtn.Text = "X"; CloseBtn.BackgroundColor3 = Color3_fromRGB(35,35,35); CloseBtn.TextColor3 = Color3_fromRGB(200,200,200); CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
     CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; Config.Global.MenuOpen = false end)
 
-    -- Start dragging when clicking the top bar specifically
-    Top.InputBegan:Connect(function(input)
-        if not Main.Visible then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = Main.Position
-            dragInput = input
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    dragInput = nil
-                end
-            end)
-        end
-    end)
+    UpdateStatusLabel()
 
     -- Page container
     local PageContainer = Instance.new("Frame", Main); PageContainer.Size = UDim2.new(1, -150, 1, -50); PageContainer.Position = UDim2.new(0,150,0,40); PageContainer.BackgroundTransparency = 1
@@ -370,6 +410,8 @@ local function ClearDrawing(plr)
     end)
     ESP_Store[plr] = nil
 end
+
+table.insert(Connections, Players.PlayerRemoving:Connect(ClearDrawing))
 
 -- Player features
 local FlyBodyVelocity, FlyConnection
@@ -639,3 +681,4 @@ end
 table.insert(Connections, RunService.RenderStepped:Connect(MainRender))
 
 warn("GammaHub Universal FPS (clean) loaded")
+
