@@ -122,9 +122,27 @@ function Library:CreateUI()
 
     -- Top bar
     local Top = Instance.new("Frame", Main); Top.Size = UDim2.new(1,0,0,40); Top.BackgroundTransparency = 1
+    Top.Active = true
     local Title = Instance.new("TextLabel", Top); Title.Text = "GammaHub · Universal FPS"; Title.Size = UDim2.new(1, -20,1,0); Title.Position = UDim2.new(0,10,0,0); Title.BackgroundTransparency = 1; Title.TextColor3 = Color3_fromRGB(220,220,220); Title.Font = Enum.Font.GothamBold; Title.TextSize = 16; Title.TextXAlignment = Enum.TextXAlignment.Left
     local CloseBtn = Instance.new("TextButton", Top); CloseBtn.Size = UDim2.new(0,28,0,28); CloseBtn.Position = UDim2.new(1, -36, 0.5, -14); CloseBtn.Text = "X"; CloseBtn.BackgroundColor3 = Color3_fromRGB(35,35,35); CloseBtn.TextColor3 = Color3_fromRGB(200,200,200); CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
     CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; Config.Global.MenuOpen = false end)
+
+    -- Start dragging when clicking the top bar specifically
+    Top.InputBegan:Connect(function(input)
+        if not Main.Visible then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+            dragInput = input
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    dragInput = nil
+                end
+            end)
+        end
+    end)
 
     -- Page container
     local PageContainer = Instance.new("Frame", Main); PageContainer.Size = UDim2.new(1, -150, 1, -50); PageContainer.Position = UDim2.new(0,150,0,40); PageContainer.BackgroundTransparency = 1
