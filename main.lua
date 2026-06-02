@@ -190,24 +190,29 @@ function Library:CreateUI()
     local CloseBtn = Instance.new("TextButton", Top); CloseBtn.Size = UDim2.new(0,28,0,28); CloseBtn.Position = UDim2.new(1, -36, 0.5, -14); CloseBtn.Text = "X"; CloseBtn.BackgroundColor3 = Color3_fromRGB(35,35,35); CloseBtn.TextColor3 = Color3_fromRGB(200,200,200); CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14; Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
     CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; Config.Global.MenuOpen = false end)
 
-    Top.InputBegan:Connect(function(input)
+    -- Drag capture: invisible button behind controls to reliably capture top-bar drags
+    local DragCapture = Instance.new("TextButton", Top)
+    DragCapture.Size = UDim2.new(1,0,1,0)
+    DragCapture.Position = UDim2.new(0,0,0,0)
+    DragCapture.BackgroundTransparency = 1
+    DragCapture.AutoButtonColor = false
+    DragCapture.Text = ""
+    DragCapture.ZIndex = 1
+
+    -- make important controls above capture
+    Title.ZIndex = 2
+    StatusLabel.ZIndex = 2
+    LockBtn.ZIndex = 3
+    CloseBtn.ZIndex = 3
+
+    DragCapture.MouseButton1Down:Connect(function()
         if not Main.Visible or Config.Global.LockGUI then return end
-        if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-        if input.Target and input.Target:IsDescendantOf(Top) then
-            if input.Target:IsA("GuiButton") or input.Target:IsA("TextBox") then
-                return
-            end
-        end
         dragging = true
-        dragStart = input.Position
+        dragStart = UserInputService:GetMouseLocation()
         startPos = Main.Position
-        dragInput = input
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-                dragInput = nil
-            end
-        end)
+    end)
+    DragCapture.MouseButton1Up:Connect(function()
+        dragging = false
     end)
 
     UpdateStatusLabel()
@@ -450,6 +455,7 @@ table.insert(Connections, Players.PlayerRemoving:Connect(ClearDrawing))
 -- Player features
 local FlyBodyVelocity, FlyConnection
 local InvisActive, InvisSavedCFrame, InvisUpdateConn = false, nil, nil
+local InvisBackup = {}
 local GodmodeConnection
 local AntiRecoilConnection
 
@@ -508,12 +514,19 @@ end
 local function StartInvisibility()
     if InvisActive then return end
     local char = LocalPlayer.Character; if not char then return end
-    InvisActive = true; InvisSavedCFrame = char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+    InvisActive = true
+    InvisBackup = {}
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    InvisSavedCFrame = hrp and hrp.CFrame
     for _, obj in pairs(char:GetDescendants()) do
-        if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then obj.Transparency = 1 end
-        if obj:IsA("Decal") or obj:IsA("Texture") then obj.Transparency = 1 end
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") or obj:IsA("Texture") then
+            pcall(function()
+                InvisBackup[obj] = obj.Transparency
+                obj.Transparency = 1
+            end)
+        end
     end
-    if char:FindFirstChild("HumanoidRootPart") then char.HumanoidRootPart.CFrame = (char.HumanoidRootPart.CFrame * CFrame.new(0,-5000,0)) end
+    if hrp then pcall(function() hrp.CanCollide = false end) end
     InvisUpdateConn = RunService.RenderStepped:Connect(function() if not InvisActive or not Config.Players.Invisibility then return end end)
 end
 local function StopInvisibility()
@@ -521,11 +534,13 @@ local function StopInvisibility()
     InvisActive = false
     if InvisUpdateConn then InvisUpdateConn:Disconnect(); InvisUpdateConn = nil end
     local char = LocalPlayer.Character; if not char then return end
-    for _, obj in pairs(char:GetDescendants()) do
-        if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.Name ~= "HumanoidRootPart" then obj.Transparency = 0 end
-        if obj:IsA("Decal") or obj:IsA("Texture") then obj.Transparency = 0 end
+    for obj, val in pairs(InvisBackup) do
+        pcall(function()
+            if obj and obj.Parent then obj.Transparency = val end
+        end)
     end
-    if char:FindFirstChild("HumanoidRootPart") and InvisSavedCFrame then char.HumanoidRootPart.CFrame = InvisSavedCFrame * CFrame.new(0,3,0) end
+    InvisBackup = {}
+    if char:FindFirstChild("HumanoidRootPart") and InvisSavedCFrame then pcall(function() char.HumanoidRootPart.CFrame = InvisSavedCFrame * CFrame.new(0,3,0) end) end
     InvisSavedCFrame = nil
 end
 
