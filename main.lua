@@ -91,6 +91,10 @@ function Library:CreateUI()
     Main.InputBegan:Connect(function(input)
         if not Main.Visible then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            -- only start dragging when clicking the top bar area (approx 40px)
+            local absPos = Main.AbsolutePosition
+            local relY = input.Position.Y - absPos.Y
+            if relY < 0 or relY > 40 then return end
             dragging = true
             dragStart = input.Position
             startPos = Main.Position
@@ -202,10 +206,15 @@ local Window, GUIInstance = Library:CreateUI()
 
 -- Toggle menu with Insert key
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Config.Global.Keybind then
+        if UserInputService:GetFocusedTextBox() then return end
         if MainFrameInstance then
             MainFrameInstance.Visible = not MainFrameInstance.Visible
             Config.Global.MenuOpen = MainFrameInstance.Visible
+            pcall(function()
+                SendNotification("Menu " .. (MainFrameInstance.Visible and "opened" or "closed"), Color3_fromRGB(120,200,255))
+            end)
         end
     end
 end))
