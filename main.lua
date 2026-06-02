@@ -86,14 +86,12 @@ local Config = {
         RecoilStrength = 5,
     }
     ,Troll = {
-        Enabled = false,
         Spin = false,
         SpinSpeed = 20,
         AttachEnabled = false,
         AttachTarget = "",
         OrbitEnabled = false,
         OrbitSpeed = 10,
-        AnnoyPlayers = false,
     }
 }
 
@@ -547,20 +545,49 @@ PlayersTab:AddToggle("Invisibility [experimental]", Config.Players, "Invisibilit
 PlayersTab:AddToggle("Godmode", Config.Players, "Godmode")
 PlayersTab:AddSlider("Walk Speed", Config.Players, "WalkSpeed", 1, 100, false)
 
-local OthersTab = Window:CreateTab("Others")
-OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
-OthersTab:AddSlider("Recoil Strength", Config.Others, "RecoilStrength", 1, 30, false)
- 
 local TrollTab = Window:CreateTab("Troll")
-TrollTab:AddToggle("Enable Troll", Config.Troll, "Enabled")
 TrollTab:AddToggle("Spin", Config.Troll, "Spin")
 TrollTab:AddSlider("Spin Speed", Config.Troll, "SpinSpeed", 1, 100, false)
 local _tb, _btn = TrollTab:AddTextbox("Target Name", "PlayerName", function(txt) Config.Troll.AttachTarget = txt end)
 TrollTab:AddToggle("Attach To Head", Config.Troll, "AttachEnabled")
 TrollTab:AddToggle("Orbit Part", Config.Troll, "OrbitEnabled")
 TrollTab:AddSlider("Orbit Speed", Config.Troll, "OrbitSpeed", 1, 50, false)
-TrollTab:AddToggle("Annoy Players (Billboard)", Config.Troll, "AnnoyPlayers")
 
+local EmotesTab = Window:CreateTab("Emotes")
+EmotesTab:AddButton("Spin Dance", function()
+    pcall(function() Emote_SpinDance() end)
+end)
+EmotesTab:AddButton("Hop Party", function()
+    pcall(function() Emote_HopParty() end)
+end)
+EmotesTab:AddButton("Moonwalk", function()
+    pcall(function() Emote_Moonwalk() end)
+end)
+EmotesTab:AddButton("Confetti", function()
+    pcall(function() Emote_Confetti() end)
+end)
+EmotesTab:AddButton("Teleport Pop", function()
+    pcall(function() Emote_TelePop() end)
+end)
+EmotesTab:AddButton("Headbob", function()
+    pcall(function() Emote_Headbob() end)
+end)
+EmotesTab:AddButton("Jiggle", function()
+    pcall(function() Emote_Jiggle() end)
+end)
+EmotesTab:AddButton("Wave Pose", function()
+    pcall(function() Emote_WavePose() end)
+end)
+EmotesTab:AddButton("Disco", function()
+    pcall(function() Emote_Disco() end)
+end)
+EmotesTab:AddButton("Slide", function()
+    pcall(function() Emote_Slide() end)
+end)
+
+local OthersTab = Window:CreateTab("Others")
+OthersTab:AddToggle("Anti Recoil", Config.Others, "AntiRecoil")
+OthersTab:AddSlider("Recoil Strength", Config.Others, "RecoilStrength", 1, 30, false)
 local SetTab = Window:CreateTab("Settings")
 SetTab:AddButton("UNLOAD THE SCRIPT", function()
     ScriptRunning = false
@@ -901,7 +928,6 @@ end
 local TrollSpinConn = nil
 local TrollAttachConn = nil
 local TrollOrbitConn = nil
-local TrollBillboards = {}
 local TrollOrbitPart = nil
 
 local function StartSpin()
@@ -992,34 +1018,176 @@ local function StopOrbit()
     if TrollOrbitPart then TrollOrbitPart:Destroy() TrollOrbitPart = nil end
 end
 
-local function UpdateAnnoyBillboards()
-    if Config.Troll.AnnoyPlayers then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                if not TrollBillboards[p] then
-                    local bb = Instance.new("BillboardGui")
-                    bb.Size = UDim2.new(0,100,0,40)
-                    bb.AlwaysOnTop = true
-                    bb.StudsOffset = Vector3.new(0, 1.5, 0)
-                    bb.Parent = p.Character.Head
-                    local lbl = Instance.new("TextLabel")
-                    lbl.Size = UDim2.new(1,0,1,0)
-                    lbl.BackgroundTransparency = 1
-                    lbl.Text = "😜 TROLL"
-                    lbl.TextColor3 = Color3_fromRGB(255,200,50)
-                    lbl.Font = Enum.Font.GothamBold
-                    lbl.TextSize = 20
-                    lbl.Parent = bb
-                    TrollBillboards[p] = bb
-                end
-            end
-        end
-    else
-        for p, bb in pairs(TrollBillboards) do
-            pcall(function() bb:Destroy() end)
-            TrollBillboards[p] = nil
-        end
+-- Emote implementations
+local function Emote_SpinDance()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local t = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp or not hrp.Parent then conn:Disconnect(); return end
+        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(720) * dt, 0)
+        if t > 3 then conn:Disconnect() end
+    end)
+end
+
+local function Emote_HopParty()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if not hum then return end
+    local t = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hum.Parent then conn:Disconnect(); return end
+        if math.floor(t*5) ~= math.floor((t-dt)*5) then hum.Jump = true end
+        if t > 3 then conn:Disconnect() end
+    end)
+end
+
+local function Emote_Moonwalk()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local t = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp.Parent then conn:Disconnect(); return end
+        local back = - (hrp.CFrame.LookVector) * (2 * dt)
+        hrp.CFrame = hrp.CFrame + back
+        if t > 2 then conn:Disconnect() end
+    end)
+end
+
+local function Emote_Confetti()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    for i=1,20 do
+        local p = Instance.new("Part")
+        p.Size = Vector3.new(0.2,0.2,0.2)
+        p.Anchored = false
+        p.CanCollide = false
+        p.Material = Enum.Material.Neon
+        p.Color = Color3.fromHSV(math.random(), 1, 1)
+        p.CFrame = head.CFrame * CFrame.new(math.random(-2,2), 2 + math.random(), math.random(-2,2))
+        p.Parent = Workspace
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(4000,4000,4000)
+        bv.Velocity = Vector3.new((math.random()-0.5)*10, math.random()*10, (math.random()-0.5)*10)
+        bv.Parent = p
+        game:GetService("Debris"):AddItem(p, 2)
     end
+end
+
+local function Emote_TelePop()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local start = hrp.CFrame
+    local t = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp.Parent then conn:Disconnect(); return end
+        local offset = Vector3.new((math.random()-0.5)*2, 0, (math.random()-0.5)*2)
+        hrp.CFrame = start * CFrame.new(offset)
+        if t > 1 then hrp.CFrame = start; conn:Disconnect() end
+    end)
+end
+
+local function Emote_Headbob()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local t = 0
+    local conn
+    local orig = hrp.CFrame
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp.Parent then conn:Disconnect(); return end
+        local y = math.sin(t*10) * 0.2
+        hrp.CFrame = orig * CFrame.new(0, y, 0)
+        if t > 3 then hrp.CFrame = orig; conn:Disconnect() end
+    end)
+end
+
+local function Emote_Jiggle()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local t = 0
+    local conn
+    local orig = hrp.CFrame
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp.Parent then conn:Disconnect(); return end
+        local dx = (math.random()-0.5)*0.2
+        local dz = (math.random()-0.5)*0.2
+        hrp.CFrame = orig * CFrame.new(dx, 0, dz)
+        if t > 2 then hrp.CFrame = orig; conn:Disconnect() end
+    end)
+end
+
+local function Emote_WavePose()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local t = 0
+    local conn
+    local orig = hrp.CFrame
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not hrp.Parent then conn:Disconnect(); return end
+        local ang = math.sin(t*6) * 0.4
+        hrp.CFrame = orig * CFrame.Angles(0, ang, 0)
+        if t > 2.5 then hrp.CFrame = orig; conn:Disconnect() end
+    end)
+end
+
+local function Emote_Disco()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(0.4,0.4,0.4)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Parent = Workspace
+    local t = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        t = t + dt
+        if not head.Parent then conn:Disconnect(); part:Destroy(); return end
+        part.CFrame = head.CFrame * CFrame.new(0,1.5,0)
+        part.Color = Color3.fromHSV((t*2) % 1, 1, 1)
+        if t > 4 then conn:Disconnect(); part:Destroy() end
+    end)
+end
+
+local function Emote_Slide()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local vel = Instance.new("BodyVelocity")
+    vel.MaxForce = Vector3.new(1e5, 0, 1e5)
+    vel.Velocity = hrp.CFrame.LookVector * 20
+    vel.Parent = hrp
+    game:GetService("Debris"):AddItem(vel, 1)
 end
 
 -- Main Loop
@@ -1074,7 +1242,6 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     if Config.Troll.Spin and not TrollSpinConn then StartSpin() elseif not Config.Troll.Spin and TrollSpinConn then StopSpin() end
     if Config.Troll.AttachEnabled and not TrollAttachConn then StartAttach() elseif not Config.Troll.AttachEnabled and TrollAttachConn then StopAttach() end
     if Config.Troll.OrbitEnabled and not TrollOrbitConn then StartOrbit() elseif not Config.Troll.OrbitEnabled and TrollOrbitConn then StopOrbit() end
-    UpdateAnnoyBillboards()
 end))
 
 -- Character Reset
